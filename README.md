@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kantin Terdaftar - E-Kantin App
 
-## Getting Started
+Aplikasi web minimalis untuk mencari dan menemukan kantin terdaftar dengan desain hitam-putih yang aesthetic.
 
-First, run the development server:
+## 🚀 Fitur
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Pencarian Kantin** - Cari kantin berdasarkan nama atau menu
+- **Filter Waktu Makan** - Filter berdasarkan Makan Pagi, Makan Siang, atau Snack
+- **Daftar Kantin** - Tampilan kartu dengan informasi kantin
+- **Status Real-time** - Lihat status buka/tutup kantin
+- **Responsive Design** - Optimal di desktop dan mobile
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Teknologi
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Next.js 16** - React Framework
+- **TypeScript** - Type Safety
+- **Tailwind CSS 4** - Styling
+- **Supabase** - Database & Backend
+- **Lucide React** - Icons
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📦 Instalasi
 
-## Learn More
+1. Clone repository ini
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+3. Setup environment variables:
+   File `.env.local` sudah dibuat dengan konfigurasi:
+   ```
+   SUPABASE_URL=https://krvehrwfaokhscsxjlsm.supabase.co
+   SUPABASE_ANON_KEY=your_anon_key
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. Setup database di Supabase:
+   - Buka Supabase Dashboard: https://supabase.com/dashboard/project/krvehrwfaokhscsxjlsm
+   - Pergi ke SQL Editor
+   - Jalankan script dari file `supabase-schema.sql`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. Jalankan development server:
+   ```bash
+   npm run dev
+   ```
 
-## Deploy on Vercel
+6. Buka browser di [http://localhost:3000](http://localhost:3000)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🗄️ Struktur Database
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Tabel `kantins`:
+- `id` - UUID (Primary Key)
+- `nama` - Nama kantin
+- `foto_url` - URL foto kantin
+- `status` - Status buka/tutup
+- `makan_pagi` - Tersedia untuk makan pagi
+- `makan_siang` - Tersedia untuk makan siang
+- `snack` - Tersedia untuk snack
+- `created_at` - Timestamp
+
+## 🎨 Desain
+
+Aplikasi menggunakan tema hitam-putih dengan:
+- Font Geist Sans untuk tampilan modern
+- Border hitam tebal untuk aesthetic
+- Shadow effect pada hover
+- Rounded corners untuk card
+- Minimalist & clean interface
+
+## 📱 Responsive
+
+- Desktop: Grid 4 kolom
+- Tablet: Grid 2-3 kolom  
+- Mobile: Grid 1-2 kolom
+
+## 🔒 Security
+
+- Row Level Security (RLS) diaktifkan
+- Public read access untuk data kantin
+- Authenticated users only untuk insert data
+
+## 📝 License
+
+MIT License - Bebas digunakan untuk project pribadi maupun komersial.
+
