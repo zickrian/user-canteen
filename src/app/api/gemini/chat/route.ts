@@ -11,13 +11,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Prepare context data for Gemini
+    const apiKey = process.env.GEMINI_API_KEY
+    
+    if (!apiKey) {
+      console.error('GEMINI_API_KEY not configured')
+      return NextResponse.json(
+        { error: 'API key not configured' },
+        { status: 500 }
+      )
+    }
+
+    // Prepare context data for AI
     const menuContext = menus ? menus.map((menu: any) => {
       const kantin = kantins?.find((k: any) => k.id === menu.kantin_id)
-      return `• ${menu.nama_menu} - Rp${menu.harga} - ${menu.deskripsi || 'Tidak ada deskripsi'} - Kantin: ${kantin?.nama_kantin || 'Unknown'} - Kategori: ${menu.kategori_menu || 'Tidak ada kategori'} - Terjual: ${menu.total_sold || 0}`
+      return `• ${menu.nama_menu} - Rp${menu.harga} - ${menu.deskripsi || 'Tidak ada deskripsi'} - Kantin: ${kantin?.nama_kantin || 'Unknown'} - Kategori: ${menu.kategori_menu || 'Tidak ada kategori'} - Terjual: ${menu.total_sold || 0} - Status: ${menu.tersedia ? 'Tersedia' : 'Habis'}`
     }).join('\n') : 'Tidak ada menu tersedia'
 
-    const kantinContext = kantins ? kantins.map((kantin: any) => 
+    const kantinContext = kantins ? kantins.map((kantin: any) =>
       `• ${kantin.nama_kantin} - Status: ${kantin.buka_tutup ? 'Buka' : 'Tutup'} - Jam: ${kantin.jam_buka || '-'} - ${kantin.jam_tutup || '-'}`
     ).join('\n') : 'Tidak ada kantin tersedia'
 
@@ -39,16 +49,21 @@ Aturan:
 6. Jika tidak ada menu yang cocok, berikan alternatif atau saran
 7. Selalu akhiri dengan tawaran bantuan tambahan
 8. Jangan terlalu formal, gunakan bahasa sehari-hari yang sopan
+9. Hanya rekomendasikan menu yang tersedia (status: Tersedia)
 
 Contoh jawaban yang baik:
 - "Untuk budget 20k, saya rekomendasikan Nasi Goreng Spesial cuma Rp15.000! Enak banget dan laku keras. Mau coba?"
-- "Menu best seller kita adalah Ayam Bakar Madu, sudah terjual 150+ kali! Dagingnya empuk banget.
-- "Kalau cari yang termurah, ada Es Teh Manis cuma Rp3.000. Segar dan murah!"`
+- "Menu best seller kita adalah Ayam Bakar Madu, sudah terjual 150+ kali! Dagingnya empuk banget."
+- "Kalau cari yang termurah, ada Es Teh Manis cuma Rp3.000. Segar dan murah!"
 
+User: ${message}
+Assistant:`
+
+    // Use Gemini API directly
     const requestBody = {
       contents: [{
         parts: [{
-          text: `${systemPrompt}\n\nUser: ${message}\n\nAssistant:`
+          text: systemPrompt
         }]
       }],
       generationConfig: {
@@ -59,8 +74,8 @@ Contoh jawaban yang baik:
       }
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`,
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -70,27 +85,32 @@ Contoh jawaban yang baik:
       }
     )
 
-    if (!response.ok) {
-      const errorData = await response.text()
-      console.error('Gemini API Error:', errorData)
-      throw new Error('Failed to get response from Gemini')
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text()
+      console.error('Gemini API Error:', errorText)
+      throw new Error(`Gemini API failed: ${errorText}`)
     }
 
-    const data = await response.json()
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text
-
-    if (!aiResponse) {
-      throw new Error('No response from Gemini')
+    const data = await geminiResponse.json()
+    
+    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.error('Invalid Gemini response structure:', data)
+      throw new Error('Invalid response from Gemini API')
     }
+
+    const aiResponse = data.candidates[0].content.parts[0].text
+
+    console.log('AI Response from Gemini:', aiResponse)
 
     return NextResponse.json({
-      response: aiResponse.trim()
+      response: aiResponse.trim(),
+      api: 'Gemini'
     })
 
   } catch (error) {
-    console.error('Gemini API Error:', error)
+    console.error('AI API Error:', error)
     return NextResponse.json(
-      { error: 'Maaf, saya sedang mengalami masalah. Silakan coba lagi nanti ya!' },
+      { error: 'Maaf, saya sedang mengalami masalah koneksi ke AI. Silakan coba lagi nanti ya!' },
       { status: 500 }
     )
   }

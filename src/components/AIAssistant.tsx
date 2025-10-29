@@ -40,6 +40,9 @@ export default function AIAssistant({ menus = [], kantins = [] }: AIAssistantPro
   }, [isOpen, messages.length])
 
   const generateAIResponse = async (userMessage: string): Promise<AIResponse> => {
+    const lowerMessage = userMessage.toLowerCase()
+    
+    // Try AI API first
     try {
       const response = await fetch('/api/gemini/chat', {
         method: 'POST',
@@ -53,63 +56,149 @@ export default function AIAssistant({ menus = [], kantins = [] }: AIAssistantPro
         })
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to get AI response')
-      }
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Try to extract menu suggestions from the AI response
+        const mentionedMenus = menus.filter((menu: any) =>
+          data.response.toLowerCase().includes(menu.nama_menu.toLowerCase())
+        ).slice(0, 5)
 
-      const data = await response.json()
-      
-      // Try to extract menu suggestions from the response
-      const mentionedMenus = menus.filter((menu: any) =>
-        data.response.toLowerCase().includes(menu.nama_menu.toLowerCase())
-      ).slice(0, 5)
-
-      return {
-        message: data.response,
-        menuSuggestions: mentionedMenus.length > 0 ? mentionedMenus : undefined,
-        actionType: mentionedMenus.length > 0 ? 'recommendation' : 'general'
-      }
-
-    } catch (error) {
-      console.error('Error calling Gemini API:', error)
-      
-      // Fallback to simple logic if Gemini fails
-      const lowerMessage = userMessage.toLowerCase()
-      
-      if (lowerMessage.includes('best seller') || lowerMessage.includes('populer')) {
-        const popularMenus = menus
-          .filter(menu => menu.tersedia)
-          .sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0))
-          .slice(0, 3)
-
-        if (popularMenus.length > 0) {
-          return {
-            message: `Menu best seller kami adalah ${popularMenus[0].nama_menu}! Sudah terjual ${popularMenus[0].total_sold || 0} kali. Enak banget dan jadi favorit banyak orang. Mau coba?`,
-            menuSuggestions: popularMenus,
-            actionType: 'recommendation'
-          }
+        return {
+          message: data.response,
+          menuSuggestions: mentionedMenus.length > 0 ? mentionedMenus : undefined,
+          actionType: mentionedMenus.length > 0 ? 'recommendation' : 'general'
         }
       }
+    } catch (error) {
+      console.log('AI API not available, using smart fallback')
+    }
 
-      if (lowerMessage.includes('termurah') || lowerMessage.includes('murah')) {
-        const cheapestMenus = menus
+    // Smart fallback logic dengan respons natural
+    if (lowerMessage.includes('best seller') || lowerMessage.includes('populer') || lowerMessage.includes('favorit')) {
+      const popularMenus = menus
+        .filter(menu => menu.tersedia)
+        .sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0))
+        .slice(0, 3)
+
+      if (popularMenus.length > 0) {
+        const menu = popularMenus[0]
+        return {
+          message: `Menu best seller kami adalah ${menu.nama_menu}! Sudah terjual ${menu.total_sold || 0} kali dan jadi favorit banyak pelanggan. Rasanya enak banget dan porsinya pas. Mau coba?`,
+          menuSuggestions: popularMenus,
+          actionType: 'recommendation'
+        }
+      }
+    }
+
+    if (lowerMessage.includes('termurah') || lowerMessage.includes('murah') || lowerMessage.includes('hemat')) {
+      const cheapestMenus = menus
+        .filter(menu => menu.tersedia)
+        .sort((a, b) => a.harga - b.harga)
+        .slice(0, 3)
+
+      if (cheapestMenus.length > 0) {
+        const menu = cheapestMenus[0]
+        return {
+          message: `Kalau cari yang termurah, ada ${menu.nama_menu} cuma Rp${menu.harga.toLocaleString('id-ID')}! Murah meriah tapi tetap enak dan mengenyangkan. Cocok buat kamu yang hemat. Mau ditambahkan ke keranjang?`,
+          menuSuggestions: cheapestMenus,
+          actionType: 'budget'
+        }
+      }
+    }
+
+    // Budget queries
+    const budgetMatch = lowerMessage.match(/(\d+)k?/)
+    if (budgetMatch) {
+      const budget = parseInt(budgetMatch[1]) * 1000
+      const affordableMenus = menus
+        .filter(menu => menu.harga <= budget && menu.tersedia)
+        .sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0))
+        .slice(0, 3)
+
+      if (affordableMenus.length > 0) {
+        return {
+          message: `Dengan budget Rp${budget.toLocaleString('id-ID')}, saya rekomendasikan ${affordableMenus[0].nama_menu} cuma Rp${affordableMenus[0].harga.toLocaleString('id-ID')}! Enak banget dan masih ada sisa budget kamu. Mau coba?`,
+          menuSuggestions: affordableMenus,
+          actionType: 'budget'
+        }
+      } else {
+        const cheapestMenu = menus
           .filter(menu => menu.tersedia)
-          .sort((a, b) => a.harga - b.harga)
-          .slice(0, 3)
-
-        if (cheapestMenus.length > 0) {
+          .sort((a, b) => a.harga - b.harga)[0]
+        
+        if (cheapestMenu) {
           return {
-            message: `Menu termurah kami adalah ${cheapestMenus[0].nama_menu} cuma Rp${cheapestMenus[0].harga.toLocaleString('id-ID')}! Murah meriah dan tetap enak. Mau ditambahkan ke keranjang?`,
-            menuSuggestions: cheapestMenus,
+            message: `Budget Rp${budget.toLocaleString('id-ID')} kurang ya. Menu termurah kami ${cheapestMenu.nama_menu} cuma Rp${cheapestMenu.harga.toLocaleString('id-ID')}. Mau tambah budget dikit atau coba yang ini?`,
+            menuSuggestions: [cheapestMenu],
             actionType: 'budget'
           }
         }
       }
+    }
 
-      return {
-        message: 'Maaf, saya sedang mengalami masalah koneksi. Silakan coba lagi ya!',
-        actionType: 'general'
+    // Keyword searches
+    const keywords = ['ayam', 'nasi', 'goreng', 'mie', 'soto', 'bakso', 'es', 'teh', 'kopi', 'jus']
+    const foundKeywords = keywords.filter(keyword => lowerMessage.includes(keyword))
+    
+    if (foundKeywords.length > 0) {
+      const matchingMenus = menus.filter(menu =>
+        menu.tersedia && (
+          foundKeywords.some(keyword =>
+            menu.nama_menu.toLowerCase().includes(keyword) ||
+            menu.deskripsi?.toLowerCase().includes(keyword)
+          )
+        )
+      ).slice(0, 3)
+
+      if (matchingMenus.length > 0) {
+        return {
+          message: `Saya nemu beberapa menu dengan kata kunci "${foundKeywords.join(', ')} nih. Yang paling laku adalah ${matchingMenus[0].nama_menu}. Mau lihat detailnya?`,
+          menuSuggestions: matchingMenus,
+          actionType: 'search'
+        }
       }
+    }
+
+    // Category requests
+    const categories = ['makan pagi', 'makan siang', 'snack', 'minuman']
+    const foundCategory = categories.find(category => lowerMessage.includes(category))
+    
+    if (foundCategory) {
+      const categoryMenus = menus
+        .filter(menu => menu.tersedia && menu.kategori_menu?.includes(foundCategory))
+        .sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0))
+        .slice(0, 3)
+
+      if (categoryMenus.length > 0) {
+        return {
+          message: `Untuk ${foundCategory}, saya rekomendasikan ${categoryMenus[0].nama_menu}! Ini menu favorit untuk ${foundCategory} dan banyak yang pesan. Mau coba?`,
+          menuSuggestions: categoryMenus,
+          actionType: 'recommendation'
+        }
+      }
+    }
+
+    // General recommendations
+    if (lowerMessage.includes('rekomendasi') || lowerMessage.includes('saran') || lowerMessage.includes('enak')) {
+      const popularMenus = menus
+        .filter(menu => menu.tersedia)
+        .sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0))
+        .slice(0, 3)
+
+      if (popularMenus.length > 0) {
+        return {
+          message: `Banyak yang suka ${popularMenus[0].nama_menu}! Ini menu andalan kami dan rasanya dijamin enak. Sudah terjual ${popularMenus[0].total_sold || 0} porsi lho. Mau coba?`,
+          menuSuggestions: popularMenus,
+          actionType: 'recommendation'
+        }
+      }
+    }
+
+    // Default friendly response
+    return {
+      message: 'Halo! Saya bisa bantu kamu cari menu yang enak. Coba tanya "menu best seller", "menu termurah", atau "menu dengan budget 20k". Ada yang bisa saya bantu?',
+      actionType: 'general'
     }
   }
 
