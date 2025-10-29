@@ -260,7 +260,7 @@ export default function KantinDetailPage() {
           <h1 className="text-3xl font-bold text-black mb-4">{kantin.nama_kantin}</h1>
           
           {/* Rating */}
-          {(kantin as any).avg_rating && (
+          {(kantin as any).avg_rating ? (
             <div className="flex items-center gap-3 mb-4">
               <div className="flex items-center">
                 {renderStars((kantin as any).avg_rating)}
@@ -268,6 +268,10 @@ export default function KantinDetailPage() {
               <span className="text-sm text-gray-600">
                 {(kantin as any).avg_rating.toFixed(1)} ({(kantin as any).total_ratings} rating)
               </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-sm text-gray-500">Belum memiliki rating</span>
             </div>
           )}
 
@@ -335,7 +339,7 @@ export default function KantinDetailPage() {
                       <div>
                         <p className="text-lg font-bold text-black">{formatPrice(menu.harga)}</p>
                         <p className="text-xs text-gray-500">
-                          📊 Dibeli: {menu.total_sold || 0} kali
+                          Dibeli: {menu.total_sold || 0} kali
                         </p>
                       </div>
                       <button

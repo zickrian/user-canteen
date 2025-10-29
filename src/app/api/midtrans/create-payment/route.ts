@@ -52,14 +52,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Midtrans transaction
-    const transaction = await snap.createTransaction({
+    const transaction = await (snap as any).createTransaction({
       transaction_details: transactionDetails,
       item_details: itemDetails,
       customer_details: customerDetails,
-      enabled_payments: ['qris'],
-      qris: {
-        acquirer: 'gopay'
-      }
+      enabled_payments: ['qris']
     })
 
     // Save order to database
@@ -72,9 +69,7 @@ export async function POST(request: NextRequest) {
         nama_pemesan: orderData.customerDetails.nama_pelanggan || 'Pelanggan',
         catatan: orderData.customerDetails.catatan_pesanan,
         total_harga: orderData.grossAmount,
-        status: 'menunggu',
-        midtrans_token: transaction.token,
-        midtrans_redirect_url: transaction.redirect_url
+        status: 'menunggu'
       })
       .select()
       .single()

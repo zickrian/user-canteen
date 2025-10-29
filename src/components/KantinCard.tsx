@@ -70,7 +70,7 @@ export default function KantinCard({ kantin }: KantinCardProps) {
         </div>
 
         {/* Rating */}
-        {(kantin.avg_rating && kantin.total_ratings && kantin.total_ratings > 0) && (
+        {(kantin.avg_rating && kantin.total_ratings && kantin.total_ratings > 0) ? (
           <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center">
               {renderStars(kantin.avg_rating)}
@@ -78,6 +78,10 @@ export default function KantinCard({ kantin }: KantinCardProps) {
             <span className="text-xs text-gray-600">
               {kantin.avg_rating.toFixed(1)} ({kantin.total_ratings})
             </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs text-gray-500">Belum memiliki rating</span>
           </div>
         )}
 
@@ -95,7 +99,7 @@ export default function KantinCard({ kantin }: KantinCardProps) {
         <div className="flex gap-2 flex-wrap">
           {/* You can add category badges here if you have category data for kantins */}
           <span className="text-xs px-2 py-1 border border-black rounded-md">
-            {kantin.status === 'aktif' ? 'Tersedia' : 'Tidak Aktif'}
+            {kantin.buka_tutup && kantin.status === 'aktif' ? 'Open' : 'Close'}
           </span>
         </div>
       </div>
