@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 
-type MealTime = 'makan_pagi' | 'makan_siang' | 'snack' | 'minuman' | 'none'
+type MealTime = 'Makan Pagi' | 'Makan Siang' | 'Snack' | 'Minuman' | ''
 
 interface MealFilterProps {
   selected: MealTime
@@ -12,22 +12,22 @@ interface MealFilterProps {
 const filters: { label: string; value: MealTime; icon?: string }[] = [
   {
     label: 'Makan Pagi',
-    value: 'makan_pagi',
+    value: 'Makan Pagi',
     icon: 'https://png.pngtree.com/png-vector/20230901/ourmid/pngtree-breakfast-icon-illustration-vector-png-image_7016287.png',
   },
   {
     label: 'Makan Siang',
-    value: 'makan_siang',
+    value: 'Makan Siang',
     icon: 'https://png.pngtree.com/png-clipart/20230913/original/pngtree-packed-lunch-vector-png-image_11058643.png',
   },
   {
     label: 'Snack',
-    value: 'snack',
-    icon: 'https://cdn.creazilla.com/cliparts/7771642/snacks-clipart-lg.png',
+    value: 'Snack',
+    icon: 'https://cdn-icons-png.flaticon.com/512/2575/2575818.png',
   },
   {
     label: 'Minuman',
-    value: 'minuman',
+    value: 'Minuman',
     icon: 'https://png.pngtree.com/png-clipart/20230913/original/pngtree-beverages-clipart-collection-of-drinks-with-various-fruit-cartoon-vector-png-image_11064846.png',
   },
 ]
@@ -38,7 +38,7 @@ export default function MealFilter({ selected, onSelect }: MealFilterProps) {
       {filters.map((filter) => (
         <button
           key={filter.value}
-          onClick={() => onSelect(filter.value)}
+          onClick={() => onSelect(selected === filter.value ? '' : filter.value)}
           className={`
             min-w-max p-4 rounded-lg transition-all shrink-0
             ${
