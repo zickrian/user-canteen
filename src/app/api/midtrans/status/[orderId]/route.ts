@@ -28,27 +28,57 @@ export async function GET(
       )
     }
 
-    // Get transaction status from Midtrans
+    // Get transaction status from Midtrans using the midtrans order ID
     const transaction = await (snap as any).transaction.status(orderId)
 
-    // Update order status in database if needed
-    if (transaction.transaction_status === 'settlement') {
-      const { error } = await supabase
-        .from('pesanan')
-        .update({ 
-          status: 'diproses',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId)
+    // Find the pesanan by midtrans order ID first
+    const { data: paymentData, error: paymentFetchError } = await supabase
+      .from('pembayaran')
+      .select('pesanan_id, status')
+      .eq('midtrans_order_id', orderId)
+      .single()
 
-      if (error) {
-        console.error('Error updating order status:', error)
-      }
+    if (paymentFetchError || !paymentData) {
+      console.error('Payment record not found:', paymentFetchError)
+      return NextResponse.json(
+        { error: 'Payment record not found' },
+        { status: 404 }
+      )
     }
 
+    const pesananId = paymentData.pesanan_id
+    const midtransStatus = transaction.transaction_status
+
+    // Map Midtrans status to our payment status
+    let paymentStatus = 'pending'
+    if (midtransStatus === 'settlement') {
+      paymentStatus = 'settlement'
+    } else if (['expire', 'cancel', 'deny'].includes(midtransStatus)) {
+      paymentStatus = midtransStatus
+    }
+
+    // Update payment record
+    const { error: paymentUpdateError } = await supabase
+      .from('pembayaran')
+      .update({
+        status: paymentStatus,
+        midtrans_transaction_id: transaction.transaction_id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('midtrans_order_id', orderId)
+
+    if (paymentUpdateError) {
+      console.error('Error updating payment record:', paymentUpdateError)
+    }
+
+    // The pesanan status will be updated automatically via trigger
+    // when pembayaran status changes to settlement
+
     return NextResponse.json({
-      status: transaction.transaction_status,
+      status: midtransStatus,
+      paymentStatus: paymentStatus,
       orderId: transaction.order_id,
+      pesananId: pesananId,
       grossAmount: transaction.gross_amount,
       paymentType: transaction.payment_type,
       transactionTime: transaction.transaction_time
@@ -57,7 +87,7 @@ export async function GET(
   } catch (error) {
     console.error('Error checking payment status:', error)
     return NextResponse.json(
-      { error: 'Failed to check payment status' },
+      { error: 'Failed to check payment status: ' + (error instanceof Error ? error.message : 'Unknown error') },
       { status: 500 }
     )
   }

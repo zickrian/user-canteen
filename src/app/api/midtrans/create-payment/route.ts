@@ -26,12 +26,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate unique order ID
-    const orderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    // Generate unique order IDs
+    const pesananId = crypto.randomUUID() // For database pesanan table
+    const midtransOrderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` // For Midtrans
 
-    // Create transaction details
+    // Create transaction details for Midtrans
     const transactionDetails = {
-      order_id: orderId,
+      order_id: midtransOrderId,
       gross_amount: orderData.grossAmount
     }
 
@@ -59,11 +60,11 @@ export async function POST(request: NextRequest) {
       enabled_payments: ['qris']
     })
 
-    // Save order to database
+    // Save order to database (pesanan table)
     const { data: order, error: orderError } = await supabase
       .from('pesanan')
       .insert({
-        id: orderId,
+        id: pesananId,
         kantin_id: orderData.kantinId,
         nomor_antrian: Math.floor(Math.random() * 100) + 1,
         nama_pemesan: orderData.customerDetails.nama_pelanggan || 'Pelanggan',
@@ -75,16 +76,16 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (orderError) {
-      console.error('Error saving order:', orderError)
+      console.error('Error saving order to pesanan:', orderError)
       return NextResponse.json(
-        { error: 'Gagal menyimpan pesanan' },
+        { error: 'Gagal menyimpan pesanan: ' + orderError.message },
         { status: 500 }
       )
     }
 
-    // Save order details
+    // Save order details (detail_pesanan table)
     const detailPesanan = orderData.items.map((item: any) => ({
-      pesanan_id: orderId,
+      pesanan_id: pesananId,
       menu_id: item.menu.id,
       jumlah: item.quantity,
       harga_satuan: item.menu.harga,
@@ -98,14 +99,37 @@ export async function POST(request: NextRequest) {
     if (detailError) {
       console.error('Error saving order details:', detailError)
       return NextResponse.json(
-        { error: 'Gagal menyimpan detail pesanan' },
+        { error: 'Gagal menyimpan detail pesanan: ' + detailError.message },
+        { status: 500 }
+      )
+    }
+
+    // Save payment record (pembayaran table)
+    const { error: paymentError } = await supabase
+      .from('pembayaran')
+      .insert({
+        pesanan_id: pesananId,
+        midtrans_order_id: midtransOrderId,
+        gross_amount: orderData.grossAmount,
+        payment_type: 'qris',
+        status: 'pending',
+        email_pelanggan: orderData.customerDetails.email,
+        nomor_meja: orderData.customerDetails.nomor_meja,
+        tipe_pesanan: orderData.customerDetails.tipe_pesanan
+      })
+
+    if (paymentError) {
+      console.error('Error saving payment record:', paymentError)
+      return NextResponse.json(
+        { error: 'Gagal menyimpan record pembayaran: ' + paymentError.message },
         { status: 500 }
       )
     }
 
     return NextResponse.json({
       success: true,
-      orderId,
+      orderId: pesananId,
+      midtransOrderId,
       token: transaction.token,
       redirect_url: transaction.redirect_url
     })
@@ -113,7 +137,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Midtrans error:', error)
     return NextResponse.json(
-      { error: 'Terjadi kesalahan saat memproses pembayaran' },
+      { error: 'Terjadi kesalahan saat memproses pembayaran: ' + (error instanceof Error ? error.message : 'Unknown error') },
       { status: 500 }
     )
   }

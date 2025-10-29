@@ -33,8 +33,7 @@ export default function Home() {
         .from('kantin')
         .select(`
           *,
-          menu(id, kategori_menu),
-          ratings(rating)
+          menu(id, kategori_menu)
         `)
         .eq('status', 'aktif')
         .order('nama_kantin', { ascending: true })
@@ -49,20 +48,14 @@ export default function Home() {
 
       if (menusError) throw menusError
 
-      // Calculate ratings for each kantin
+      // Format kantins data
       const kantinsWithRating = kantinsData.map(kantin => {
-        const ratings = kantin.ratings?.map((r: { rating: number }) => r.rating).filter(Boolean) || []
-        const avgRating = ratings.length > 0
-          ? ratings.reduce((sum: number, rating: number) => sum + rating, 0) / ratings.length
-          : 0
-        
         return {
           ...kantin,
-          avg_rating: avgRating,
-          total_ratings: ratings.length,
+          avg_rating: 0,
+          total_ratings: 0,
           total_menus: kantin.menu?.length || 0,
-          menus: kantin.menu,
-          ratings: kantin.ratings
+          menus: kantin.menu
         }
       })
 

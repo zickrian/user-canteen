@@ -13,6 +13,7 @@ export default function CheckoutPage() {
   const [showQR, setShowQR] = useState(false)
   const [qrCode, setQrCode] = useState<string>('')
   const [orderId, setOrderId] = useState<string>('')
+  const [midtransOrderId, setMidtransOrderId] = useState<string>('')
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'success' | 'failed'>('pending')
   const [formData, setFormData] = useState<CheckoutForm>({
     nama_pelanggan: '',
@@ -47,18 +48,18 @@ export default function CheckoutPage() {
     }
   }
 
-  const checkPaymentStatus = async (orderId: string) => {
+  const checkPaymentStatus = async (orderIdToCheck: string) => {
     try {
-      const response = await fetch(`/api/midtrans/status/${orderId}`)
+      const response = await fetch(`/api/midtrans/status/${orderIdToCheck}`)
       const data = await response.json()
       
       if (data.status === 'settlement') {
         setPaymentStatus('success')
         setTimeout(() => {
           clearCart()
-          router.push(`/struk/${orderId}`)
+          router.push(`/struk/${data.pesananId}`)
         }, 2000)
-      } else if (data.status === 'expire' || data.status === 'cancel' || data.status === 'deny') {
+      } else if (['expire', 'cancel', 'deny'].includes(data.status)) {
         setPaymentStatus('failed')
       }
     } catch (error) {
@@ -69,16 +70,16 @@ export default function CheckoutPage() {
   useEffect(() => {
     let interval: NodeJS.Timeout
     
-    if (showQR && paymentStatus === 'pending') {
+    if (showQR && paymentStatus === 'pending' && midtransOrderId) {
       interval = setInterval(() => {
-        checkPaymentStatus(orderId)
+        checkPaymentStatus(midtransOrderId)
       }, 3000) // Check every 3 seconds
     }
 
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [showQR, paymentStatus, orderId])
+  }, [showQR, paymentStatus, midtransOrderId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -127,17 +128,21 @@ export default function CheckoutPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Gagal membuat pembayaran')
+        const errorMsg = data.error || 'Gagal membuat pembayaran'
+        console.error('API Error:', errorMsg)
+        throw new Error(errorMsg)
       }
 
       // Show QR code
       setOrderId(data.orderId)
+      setMidtransOrderId(data.midtransOrderId)
       setQrCode(data.redirect_url)
       setShowQR(true)
 
     } catch (error) {
       console.error('Error creating payment:', error)
-      alert(error instanceof Error ? error.message : 'Terjadi kesalahan saat membuat pesanan. Silakan coba lagi.')
+      const errorMsg = error instanceof Error ? error.message : 'Terjadi kesalahan saat membuat pesanan. Silakan coba lagi.'
+      alert(errorMsg)
     } finally {
       setLoading(false)
     }
