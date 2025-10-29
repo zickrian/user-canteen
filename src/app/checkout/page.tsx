@@ -320,16 +320,10 @@ export default function CheckoutPage() {
                     >
                       <Plus className="h-4 w-4" />
                     </button>
-                  </div>
-                  
-                  <div className="text-right">
-                    <p className="font-bold text-black">
-                      {formatPrice(item.menu.harga * item.quantity)}
-                    </p>
                     <button
                       type="button"
                       onClick={() => removeItem(item.menu.id)}
-                      className="text-red-500 hover:text-red-700 text-sm"
+                      className="p-1 hover:bg-gray-100 rounded text-red-500 hover:text-red-700"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

@@ -56,6 +56,7 @@ export default function MealFilter({ selected, onSelect }: MealFilterProps) {
                   alt={filter.label}
                   fill
                   className="object-contain"
+                  sizes="48px"
                   unoptimized
                 />
               </div>

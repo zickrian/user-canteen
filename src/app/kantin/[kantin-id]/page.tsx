@@ -227,6 +227,7 @@ export default function KantinDetailPage() {
             alt={kantin.nama_kantin}
             fill
             className="object-cover"
+            sizes="100vw"
           />
         ) : (
           <div className="flex items-center justify-center h-full">
@@ -321,6 +322,7 @@ export default function KantinDetailPage() {
                         alt={menu.nama_menu}
                         fill
                         className="object-cover rounded-lg"
+                        sizes="96px"
                       />
                     ) : (
                       <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
