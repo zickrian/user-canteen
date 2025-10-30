@@ -29,7 +29,7 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
   return (
     <div className="bg-white border-2 border-black rounded-2xl overflow-hidden hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-300">
       {/* Menu Image */}
-      <div className="relative w-full h-48 bg-gray-100">
+      <div className="relative w-full h-32 bg-gray-100">
         {menu.foto_menu ? (
           <Image
             src={menu.foto_menu}
@@ -41,16 +41,16 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
         ) : (
           <div className="flex items-center justify-center h-full">
             <div className="text-gray-400 text-center">
-              <div className="text-4xl mb-2">🍽️</div>
-              <p className="text-sm">No Image</p>
+              <div className="text-3xl mb-1">🍽️</div>
+              <p className="text-xs">No Image</p>
             </div>
           </div>
         )}
         
         {/* Category Badge */}
         {menu.kategori_menu && menu.kategori_menu.length > 0 && (
-          <div className="absolute top-3 left-3">
-            <span className="bg-black text-white text-xs px-3 py-1 rounded-full font-medium">
+          <div className="absolute top-2 left-2">
+            <span className="bg-black text-white text-xs px-2 py-0.5 rounded-full font-medium">
               {menu.kategori_menu[0]}
             </span>
           </div>
@@ -59,7 +59,7 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
         {/* Availability Status */}
         {!menu.tersedia && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <span className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold">
+            <span className="bg-red-500 text-white px-3 py-1 rounded-lg text-sm font-bold">
               Tidak Tersedia
             </span>
           </div>
@@ -67,26 +67,26 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
       </div>
 
       {/* Menu Info */}
-      <div className="p-4">
-        <div className="mb-3">
-          <h3 className="text-lg font-bold text-black line-clamp-2 mb-1">
+      <div className="p-3">
+        <div className="mb-2">
+          <h3 className="text-base font-bold text-black line-clamp-1 mb-1">
             {menu.nama_menu}
           </h3>
           {menu.deskripsi && (
-            <p className="text-sm text-gray-600 line-clamp-2">
+            <p className="text-xs text-gray-600 line-clamp-1">
               {menu.deskripsi}
             </p>
           )}
         </div>
 
         {/* Price and Rating */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-xl font-bold text-black">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-lg font-bold text-black">
             {formatPrice(menu.harga)}
           </div>
           
           {menu.total_sold && menu.total_sold > 0 && (
-            <div className="flex items-center gap-1 text-sm text-gray-600">
+            <div className="flex items-center gap-1 text-xs text-gray-600">
               <span>Terjual {menu.total_sold}</span>
             </div>
           )}
@@ -97,7 +97,7 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
           onClick={handleAddToCart}
           disabled={!menu.tersedia}
           className={`
-            w-full py-3 px-4 rounded-lg font-medium transition-all duration-200
+            w-full py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200
             flex items-center justify-center gap-2
             ${
               menu.tersedia
@@ -106,7 +106,7 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
             }
           `}
         >
-          <Plus className="h-5 w-5" />
+          <Plus className="h-4 w-4" />
           <span>Tambah ke Keranjang</span>
         </button>
       </div>

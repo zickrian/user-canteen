@@ -91,16 +91,16 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
     return (
       <div className="space-y-8">
         {/* Loading skeleton */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="animate-pulse">
               <div className="border-2 border-gray-200 rounded-2xl overflow-hidden">
-                <div className="w-full h-48 bg-gray-200" />
-                <div className="p-4 space-y-3">
-                  <div className="h-6 bg-gray-200 rounded w-3/4" />
-                  <div className="h-4 bg-gray-200 rounded w-full" />
-                  <div className="h-6 bg-gray-200 rounded w-1/2" />
-                  <div className="h-10 bg-gray-200 rounded" />
+                <div className="w-full h-32 bg-gray-200" />
+                <div className="p-3 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 rounded w-full" />
+                  <div className="h-5 bg-gray-200 rounded w-1/2" />
+                  <div className="h-8 bg-gray-200 rounded" />
                 </div>
               </div>
             </div>
@@ -174,7 +174,7 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
             </div>
 
             {/* Menu Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {menus.map((menu) => (
                 <MenuCard 
                   key={menu.id} 
