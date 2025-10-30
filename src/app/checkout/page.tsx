@@ -94,6 +94,19 @@ export default function CheckoutPage() {
       return
     }
 
+    // Validasi email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email.trim())) {
+      alert('Format email tidak valid')
+      return
+    }
+
+    // Validasi nomor meja wajib untuk kedua tipe pesanan
+    if (!formData.nomor_meja.trim()) {
+      alert('Nomor meja wajib diisi untuk pengiriman pesanan')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -385,15 +398,16 @@ export default function CheckoutPage() {
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-black mb-2">
                   <Table className="h-4 w-4" />
-                  Nomor Meja
+                  Nomor Meja *
                 </label>
                 <input
                   type="text"
                   name="nomor_meja"
                   value={formData.nomor_meja}
                   onChange={handleInputChange}
+                  required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-                  placeholder="Contoh: A1, B2, etc."
+                  placeholder="Contoh: A1, B2, etc. (untuk pengiriman pesanan)"
                 />
               </div>
               

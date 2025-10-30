@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, menus, kantins } = await request.json()
+    const { message, menus, kantins, context } = await request.json()
 
     if (!message) {
       return NextResponse.json(
@@ -31,6 +31,22 @@ export async function POST(request: NextRequest) {
       `• ${kantin.nama_kantin} - Status: ${kantin.buka_tutup ? 'Buka' : 'Tutup'} - Jam: ${kantin.jam_buka || '-'} - ${kantin.jam_tutup || '-'}`
     ).join('\n') : 'Tidak ada kantin tersedia'
 
+    // Build enhanced system prompt with context understanding
+    let contextInstruction = ''
+    if (context) {
+      contextInstruction = `\n\nINFORMASI KONTEKS QUERY:
+- Budget: ${context.budget ? `Rp${context.budget.toLocaleString('id-ID')}` : 'Tidak disebutkan'}
+- Keywords: ${context.keywords?.length ? context.keywords.join(', ') : 'Tidak ada'}
+- Exclude (Alergi): ${context.excludeKeywords?.length ? context.excludeKeywords.join(', ') : 'Tidak ada'}
+- Kategori: ${context.category || 'Semua'}
+- Tipe: ${context.foodType || 'Semua'}
+- Query Type: ${context.queryType || 'general'}
+- Specific Kantins: ${context.specificKantins?.length ? context.specificKantins.join(', ') : 'Tidak disebutkan'}
+- Multi-Kantin: ${context.multiKantin ? 'Ya, tampilkan dari berbagai kantin' : 'Tidak, hanya kantin tertentu'}
+
+Gunakan informasi konteks ini untuk memberikan rekomendasi yang lebih tepat!`
+    }
+
     const systemPrompt = `Kamu adalah AI Assistant untuk aplikasi E-Kantin. Kamu harus ramah, membantu, dan berbicara seperti pelayan yang profesional.
 
 Context Data:
@@ -39,22 +55,35 @@ ${menuContext}
 
 DAFTAR KANTIN:
 ${kantinContext}
+${contextInstruction}
 
-Aturan:
+Aturan PENTING:
 1. Jawab dengan bahasa Indonesia yang ramah dan natural
-2. Jika ditanya tentang menu, berikan rekomendasi berdasarkan data yang ada
-3. Jika ditanya budget, cari menu yang sesuai dengan budget tersebut
-4. Jika ditanya "best seller" atau "populer", berdasarkan total_sold
-5. Jika ditanya "termurah", berdasarkan harga terendah
-6. Jika tidak ada menu yang cocok, berikan alternatif atau saran
-7. Selalu akhiri dengan tawaran bantuan tambahan
-8. Jangan terlalu formal, gunakan bahasa sehari-hari yang sopan
-9. Hanya rekomendasikan menu yang tersedia (status: Tersedia)
+2. Jika user meminta menu dari BERBAGAI KANTIN (multi-kantin), SEBUTKAN menu dari berbagai kantin yang berbeda agar user punya pilihan
+3. Jika user menyebutkan BUDGET tertentu, HANYA sebutkan menu yang harganya sesuai atau di bawah budget tersebut
+4. Jika user menyebutkan KEYWORD tertentu, sebutkan menu dari berbagai kantin yang sesuai dengan keyword tersebut
+5. Jika user menyebutkan "MAKANAN TERMAHAL", sebutkan menu termahal dari berbagai kantin (bisa berbeda kantin)
+6. Jika user menyebutkan "MAKANAN PALING SERING DIBELI" atau "best seller", sebutkan menu dengan total_sold tertinggi dari berbagai kantin
+7. Jika user menyebutkan "ALERGI" atau "tidak bisa makan" sesuatu, JANGAN PERNAH sebutkan menu yang mengandung bahan tersebut
+8. Jika user menanyakan "MAKANAN", JANGAN sebutkan minuman
+9. Jika user menanyakan "MINUMAN", JANGAN sebutkan makanan
+10. Jika user menyebutkan kantin spesifik, fokuskan rekomendasi dari kantin tersebut
+11. Jika user TIDAK menyebutkan kantin spesifik, berikan rekomendasi dari BERBAGAI KANTIN yang berbeda
+12. Selalu SEBUTKAN NAMA KANTIN ketika merekomendasikan menu (contoh: "Nasi Goreng dari Kantin Sate Ayam")
+13. Jika tidak ada menu yang cocok dengan kriteria, berikan alternatif atau saran
+14. Selalu akhiri dengan tawaran bantuan tambahan
+15. Gunakan bahasa sehari-hari yang sopan dan ramah
 
-Contoh jawaban yang baik:
-- "Untuk budget 20k, saya rekomendasikan Nasi Goreng Spesial cuma Rp15.000! Enak banget dan laku keras. Mau coba?"
-- "Menu best seller kita adalah Ayam Bakar Madu, sudah terjual 150+ kali! Dagingnya empuk banget."
-- "Kalau cari yang termurah, ada Es Teh Manis cuma Rp3.000. Segar dan murah!"
+Contoh jawaban yang baik (multi-kantin):
+- "Untuk budget 10 ribu, saya rekomendasikan Klepon dari Kantin Sate Ayam Betawi seharga 5 ribu, atau Jus Apel dari Kantin Aneka Jus Segar seharga 5 ribu. Keduanya dari kantin berbeda dan enak banget! Bagaimana, tertarik mencoba salah satunya?"
+- "Menu termahal dari berbagai kantin: Ayam Bakar Premium dari Kantin Sate Ayam Betawi seharga Rp25.000, dan Rendang Spesial dari Kantin Nasi Padang seharga Rp30.000. Yang mana yang kamu mau?"
+- "Menu paling sering dibeli dari berbagai kantin: Nasi Goreng Spesial dari Kantin A sudah terjual 250+ kali, dan Ayam Bakar Madu dari Kantin B sudah terjual 180+ kali!"
+
+IMPORTANT: 
+- Jika user TIDAK menyebutkan kantin spesifik, SELALU sebutkan menu dari BERBAGAI KANTIN yang berbeda!
+- Jika user menyebutkan budget, JANGAN sebutkan menu yang harganya melebihi budget tersebut!
+- Jika user menyebutkan alergi, JANGAN sebutkan menu yang mengandung bahan alergen tersebut!
+- SELALU SEBUTKAN NAMA KANTIN ketika merekomendasikan menu!
 
 User: ${message}
 Assistant:`

@@ -198,6 +198,9 @@ CREATE TABLE IF NOT EXISTS public.pesanan (
   nomor_antrian INTEGER NOT NULL,
   nama_pemesan  TEXT NOT NULL,
   catatan       TEXT,
+  email         TEXT,
+  nomor_meja    TEXT,
+  tipe_pesanan  TEXT CHECK (tipe_pesanan IN ('dine_in', 'take_away')),
   total_harga   NUMERIC(10,2) NOT NULL,
   status        TEXT NOT NULL DEFAULT 'menunggu' CHECK (status IN ('menunggu','diproses','selesai')),
   created_at    TIMESTAMPTZ DEFAULT NOW(),
@@ -398,26 +401,45 @@ FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 CREATE OR REPLACE FUNCTION public.update_kantin_balance_on_order_complete()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 BEGIN
-  -- Saat order jadi 'selesai', tambah balance
-  IF NEW.status = 'selesai' AND (TG_OP = 'INSERT' OR OLD.status != 'selesai') THEN
+  -- Handle INSERT: Saat order jadi 'selesai', tambah balance
+  IF TG_OP = 'INSERT' AND NEW.status = 'selesai' THEN
     UPDATE public.kantin
     SET balance = balance + NEW.total_harga
     WHERE id = NEW.kantin_id;
   END IF;
 
-  -- Saat order di-update dari 'selesai' ke status lain, kurangi balance
+  -- Handle UPDATE: Saat order di-update dari 'selesai' ke status lain, kurangi balance
   IF TG_OP = 'UPDATE' AND OLD.status = 'selesai' AND NEW.status != 'selesai' THEN
     UPDATE public.kantin
     SET balance = balance - OLD.total_harga
     WHERE id = OLD.kantin_id;
   END IF;
 
-  RETURN NEW;
+  -- Handle UPDATE: Saat order di-update dari status lain ke 'selesai', tambah balance
+  IF TG_OP = 'UPDATE' AND OLD.status != 'selesai' AND NEW.status = 'selesai' THEN
+    UPDATE public.kantin
+    SET balance = balance + NEW.total_harga
+    WHERE id = NEW.kantin_id;
+  END IF;
+
+  -- Handle DELETE: Saat pesanan dihapus dan statusnya 'selesai', kurangi balance
+  IF TG_OP = 'DELETE' AND OLD.status = 'selesai' THEN
+    UPDATE public.kantin
+    SET balance = balance - OLD.total_harga
+    WHERE id = OLD.kantin_id;
+  END IF;
+
+  -- Return appropriate value based on operation
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  ELSE
+    RETURN NEW;
+  END IF;
 END $$;
 
 DROP TRIGGER IF EXISTS trg_update_balance ON public.pesanan;
 CREATE TRIGGER trg_update_balance
-AFTER INSERT OR UPDATE ON public.pesanan
+AFTER INSERT OR UPDATE OR DELETE ON public.pesanan
 FOR EACH ROW EXECUTE FUNCTION public.update_kantin_balance_on_order_complete();
 
 -- =============================================================================
@@ -607,6 +629,7 @@ DROP FUNCTION IF EXISTS public.get_kantin_balance_and_bank(UUID);
 DROP FUNCTION IF EXISTS public.get_daily_sales_chart(UUID, DATE);
 DROP FUNCTION IF EXISTS public.get_sales_trend(UUID, INTEGER);
 DROP FUNCTION IF EXISTS public.check_email_status(TEXT);
+DROP FUNCTION IF EXISTS public.get_next_nomor_antrian(UUID);
 
 -- ---------- UTIL FUNCTIONS ----------
 
@@ -665,6 +688,20 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
   WHERE LOWER(u.email) = LOWER(p_email)
   LIMIT 1;
 $$;
+
+-- Get next sequential nomor antrian for a kantin (starts from 1)
+CREATE FUNCTION public.get_next_nomor_antrian(p_kantin_id UUID)
+RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE
+  v_next_number INTEGER;
+BEGIN
+  -- Get the maximum nomor_antrian for this kantin and add 1, or start from 1 if no orders exist
+  SELECT COALESCE(MAX(nomor_antrian), 0) + 1 INTO v_next_number
+  FROM public.pesanan
+  WHERE kantin_id = p_kantin_id;
+  
+  RETURN v_next_number;
+END $$;
 
 -- ---------- ADMIN: APPROVE/REJECT KIOS ----------
 

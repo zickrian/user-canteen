@@ -30,6 +30,20 @@ export async function POST(request: NextRequest) {
     const pesananId = crypto.randomUUID() // For database pesanan table
     const midtransOrderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` // For Midtrans
 
+    // Get next sequential nomor antrian for this kantin
+    const { data: nomorAntrianData, error: nomorAntrianError } = await supabase
+      .rpc('get_next_nomor_antrian', { p_kantin_id: orderData.kantinId })
+
+    if (nomorAntrianError) {
+      console.error('Error getting nomor antrian:', nomorAntrianError)
+      return NextResponse.json(
+        { error: 'Gagal mendapatkan nomor antrian: ' + nomorAntrianError.message },
+        { status: 500 }
+      )
+    }
+
+    const nomorAntrian = nomorAntrianData || 1
+
     // Create transaction details for Midtrans
     const transactionDetails = {
       order_id: midtransOrderId,
@@ -60,15 +74,18 @@ export async function POST(request: NextRequest) {
       enabled_payments: ['qris']
     })
 
-    // Save order to database (pesanan table)
+    // Save order to database (pesanan table) dengan semua data yang diperlukan
     const { data: order, error: orderError } = await supabase
       .from('pesanan')
       .insert({
         id: pesananId,
         kantin_id: orderData.kantinId,
-        nomor_antrian: Math.floor(Math.random() * 100) + 1,
+        nomor_antrian: nomorAntrian,
         nama_pemesan: orderData.customerDetails.nama_pelanggan || 'Pelanggan',
-        catatan: orderData.customerDetails.catatan_pesanan,
+        catatan: orderData.customerDetails.catatan_pesanan || null,
+        email: orderData.customerDetails.email || null,
+        nomor_meja: orderData.customerDetails.nomor_meja || null,
+        tipe_pesanan: orderData.customerDetails.tipe_pesanan || null,
         total_harga: orderData.grossAmount,
         status: 'menunggu'
       })
