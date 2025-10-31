@@ -70,7 +70,7 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
       menu.deskripsi?.toLowerCase().includes(searchQuery.toLowerCase())
 
     const matchesCategory = selectedCategory === '' || 
-      menu.kategori_menu?.includes(selectedCategory)
+      menu.kategori_menu?.some(cat => cat.toLowerCase().includes(selectedCategory.toLowerCase()))
 
     return matchesSearch && matchesCategory
   })

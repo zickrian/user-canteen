@@ -110,7 +110,7 @@ export default function Home() {
       </div>
 
       {/* AI Assistant - Fixed Position Bottom Right */}
-      <AIAssistant menus={menus} kantins={kantins} />
+      <AIAssistant />
     </div>
   )
 }

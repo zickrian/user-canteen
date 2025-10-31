@@ -22,8 +22,7 @@ export default function RatingModal({
 }: RatingModalProps) {
   const [rating, setRating] = useState(0)
   const [hoveredRating, setHoveredRating] = useState(0)
-  const [review, setReview] = useState('')
-  const [namaPenilai, setNamaPenilai] = useState('')
+  const [komentar, setKomentar] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,23 +33,18 @@ export default function RatingModal({
       setError('Silakan pilih rating bintang')
       return
     }
-    
-    if (!namaPenilai.trim()) {
-      setError('Nama penilai wajib diisi')
-      return
-    }
 
     setIsSubmitting(true)
     setError(null)
 
     try {
-      const { error: submitError } = await supabase.rpc('submit_rating', {
-        p_kantin_id: kantin.id,
-        p_pesanan_id: pesananId,
-        p_rating: rating,
-        p_review: review.trim() || null,
-        p_nama_penilai: namaPenilai.trim()
-      })
+      const { error: submitError } = await supabase
+        .from('rating')
+        .insert({
+          pesanan_id: pesananId,
+          rating: rating,
+          komentar: komentar.trim() || null,
+        })
 
       if (submitError) {
         console.error('Error submitting rating:', submitError)
@@ -65,8 +59,7 @@ export default function RatingModal({
       // Reset form
       setRating(0)
       setHoveredRating(0)
-      setReview('')
-      setNamaPenilai('')
+      setKomentar('')
       
     } catch (error) {
       console.error('Error:', error)
@@ -153,29 +146,14 @@ export default function RatingModal({
             )}
           </div>
 
-          {/* Nama Penilai */}
+          {/* Komentar */}
           <div>
             <label className="block text-sm font-medium text-black mb-2">
-              Nama Anda *
-            </label>
-            <input
-              type="text"
-              value={namaPenilai}
-              onChange={(e) => setNamaPenilai(e.target.value)}
-              placeholder="Masukkan nama Anda"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-              required
-            />
-          </div>
-
-          {/* Review */}
-          <div>
-            <label className="block text-sm font-medium text-black mb-2">
-              Ulasan (Opsional)
+              Komentar (Opsional)
             </label>
             <textarea
-              value={review}
-              onChange={(e) => setReview(e.target.value)}
+              value={komentar}
+              onChange={(e) => setKomentar(e.target.value)}
               placeholder="Bagikan pengalaman Anda..."
               rows={4}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black resize-none"

@@ -3,24 +3,34 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'ekantin-ai',
+    },
+  },
+})
 
 // Database types based on schema
 export type Kantin = {
   id: string
   user_id: string
   nama_kantin: string
+  status: 'pending' | 'aktif' | 'ditolak'
+  created_at: string
+  updated_at: string
   foto_profil: string | null
   jam_buka: string | null
   jam_tutup: string | null
-  status: 'pending' | 'aktif' | 'ditolak'
   buka_tutup: boolean
+  balance: number
   bank_name: string | null
   account_number: string | null
   account_name: string | null
-  balance: number
-  created_at: string
-  updated_at: string
 }
 
 export type Menu = {
@@ -31,10 +41,10 @@ export type Menu = {
   foto_menu: string | null
   deskripsi: string | null
   tersedia: boolean
-  kategori_menu: string[]
-  total_sold?: number
+  kategori_menu: string[] | null  // JSONB di database
   created_at: string
   updated_at: string
+  total_sold: number
 }
 
 export type Pesanan = {
@@ -47,6 +57,9 @@ export type Pesanan = {
   status: 'menunggu' | 'diproses' | 'selesai'
   created_at: string
   updated_at: string
+  email: string | null
+  nomor_meja: string | null
+  tipe_pesanan: string | null
 }
 
 export type DetailPesanan = {
@@ -57,16 +70,46 @@ export type DetailPesanan = {
   harga_satuan: number
   subtotal: number
   created_at: string
-  menu?: Menu
+}
+
+export type Pembayaran = {
+  id: string
+  pesanan_id: string
+  midtrans_order_id: string | null
+  midtrans_transaction_id: string | null
+  gross_amount: number
+  payer_id: string | null  // auth.users.id
+  status: string
+  email_pelanggan: string | null
+  nomor_meja: string | null
+  tipe_pesanan: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type Rating = {
   id: string
-  kantin_id: string
   pesanan_id: string
+  menu_id: string | null
   rating: number
-  review: string | null
-  nama_penilai: string
+  komentar: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type Admin = {
+  user_id: string
+  created_at: string
+}
+
+export type Cashout = {
+  id: string
+  kantin_id: string
+  amount: number
+  status: string
+  requested_at: string
+  transferred_at: string | null
+  transferred_by: string | null
   created_at: string
   updated_at: string
 }

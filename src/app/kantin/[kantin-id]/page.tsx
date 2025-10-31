@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { useCart } from '@/contexts/CartContext'
 import SearchBar from '@/components/SearchBar'
 import MealFilter, { type MealTime } from '@/components/MealFilter'
+import AIAssistant from '@/components/AIAssistant'
 
 export default function KantinDetailPage() {
   const params = useParams()
@@ -315,7 +316,7 @@ export default function KantinDetailPage() {
               {filteredMenus.map((menu) => (
                 <div key={menu.id} className="flex gap-4 p-4 border-2 border-gray-200 rounded-xl hover:border-black transition-colors">
                   {/* Menu Image */}
-                  <div className="relative w-24 h-24 flex-shrink-0">
+                  <div className="relative w-24 h-24 shrink-0">
                     {menu.foto_menu ? (
                       <Image
                         src={menu.foto_menu}
@@ -359,6 +360,9 @@ export default function KantinDetailPage() {
           )}
         </div>
       </div>
+
+      {/* AI Assistant */}
+      <AIAssistant kantinId={kantinId} kantin={kantin} />
     </div>
   )
 }
