@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google/genai": "^1.28.0",
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.76.1",
     "lucide-react": "^0.548.0",
     "midtrans-client": "^1.4.3",

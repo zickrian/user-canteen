@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { GoogleGenAI } from "@google/genai"
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,14 +15,14 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY
     
     if (!apiKey) {
-      console.error('GEMINI_API_KEY not configured')
+      console.error('GEMINI_API_KEY not configured in .env.local')
       return NextResponse.json(
-        { error: 'API key not configured' },
+        { error: 'API key not configured. Please add GEMINI_API_KEY to .env.local' },
         { status: 500 }
       )
     }
 
-    // Prepare context data for AI
+    // Prepare menu context
     const menuContext = menus ? menus.map((menu: any) => {
       const kantin = kantins?.find((k: any) => k.id === menu.kantin_id)
       return `• ${menu.nama_menu} - Rp${menu.harga} - ${menu.deskripsi || 'Tidak ada deskripsi'} - Kantin: ${kantin?.nama_kantin || 'Unknown'} - Kategori: ${menu.kategori_menu || 'Tidak ada kategori'} - Terjual: ${menu.total_sold || 0} - Status: ${menu.tersedia ? 'Tersedia' : 'Habis'}`
@@ -31,25 +32,41 @@ export async function POST(request: NextRequest) {
       `• ${kantin.nama_kantin} - Status: ${kantin.buka_tutup ? 'Buka' : 'Tutup'} - Jam: ${kantin.jam_buka || '-'} - ${kantin.jam_tutup || '-'}`
     ).join('\n') : 'Tidak ada kantin tersedia'
 
-    // Build enhanced system prompt with context understanding
+    // Build context instruction
     let contextInstruction = ''
     if (context) {
-      contextInstruction = `\n\nINFORMASI KONTEKS QUERY:
-- Budget: ${context.budget ? `Rp${context.budget.toLocaleString('id-ID')}` : 'Tidak disebutkan'}
+      contextInstruction = `
+KONTEKS USER:
+- Budget: ${context.budget ? `Rp${context.budget.toLocaleString('id-ID')}` : 'Tidak ada'}
 - Keywords: ${context.keywords?.length ? context.keywords.join(', ') : 'Tidak ada'}
-- Exclude (Alergi): ${context.excludeKeywords?.length ? context.excludeKeywords.join(', ') : 'Tidak ada'}
+- Hindari: ${context.excludeKeywords?.length ? context.excludeKeywords.join(', ') : 'Tidak ada'}
 - Kategori: ${context.category || 'Semua'}
 - Tipe: ${context.foodType || 'Semua'}
-- Query Type: ${context.queryType || 'general'}
-- Specific Kantins: ${context.specificKantins?.length ? context.specificKantins.join(', ') : 'Tidak disebutkan'}
-- Multi-Kantin: ${context.multiKantin ? 'Ya, tampilkan dari berbagai kantin' : 'Tidak, hanya kantin tertentu'}
-
-Gunakan informasi konteks ini untuk memberikan rekomendasi yang lebih tepat!`
+- Jumlah: ${context.requestedCount || 'Tidak spesifik'}
+`
     }
 
-    const systemPrompt = `Kamu adalah AI Assistant untuk aplikasi E-Kantin. Kamu harus ramah, membantu, dan berbicara seperti pelayan yang profesional.
+    const systemPrompt = `PERAN DAN TUJUAN:
+Kamu adalah asisten kuliner digital pintar untuk sistem E-Kantin. 
+Tugasmu adalah membantu pengguna menemukan menu, memberi rekomendasi, atau menjawab pertanyaan tentang makanan, minuman, dan kantin dengan cara yang cepat, relevan, dan ramah.
+Kamu tidak membuat keputusan bisnis atau mengeksekusi perintah yang berbahaya.
+Kamu hanya berinteraksi melalui tool dan data yang disediakan oleh sistem.
 
-Context Data:
+SIFAT DAN GAYA KOMUNIKASI:
+- Gunakan bahasa Indonesia yang natural, sopan, dan bersahabat, seperti teman ngobrol.
+- Jangan gunakan tanda **markdown**, bold (**), italic (*), atau format kode.
+- Gunakan emoji secara ringan untuk menambah kesan ramah (😊, 🍛, ☕, 💰, dll).
+- Jangan gunakan istilah teknis atau kode SQL di depan pengguna.
+- Jawabanmu harus singkat, relevan, dan langsung menjawab niat pengguna.
+
+BATASAN DAN KEAMANAN:
+1. Jangan pernah menulis atau menebak query SQL sendiri.
+2. Hanya gunakan fungsi atau tool yang telah disediakan oleh sistem.
+3. Tidak boleh mengubah data (insert/update/delete) — hanya membaca.
+4. Jika data tidak ditemukan, beri saran atau alternatif, jangan berimprovisasi data palsu.
+5. Jangan menampilkan struktur tabel, nama kolom, atau informasi teknis internal.
+
+DATA YANG TERSEDIA:
 DAFTAR MENU:
 ${menuContext}
 
@@ -57,38 +74,41 @@ DAFTAR KANTIN:
 ${kantinContext}
 ${contextInstruction}
 
-Aturan PENTING:
-1. Jawab dengan bahasa Indonesia yang ramah dan natural
-2. Jika user meminta menu dari BERBAGAI KANTIN (multi-kantin), SEBUTKAN menu dari berbagai kantin yang berbeda agar user punya pilihan
-3. Jika user menyebutkan BUDGET tertentu, HANYA sebutkan menu yang harganya sesuai atau di bawah budget tersebut
-4. Jika user menyebutkan KEYWORD tertentu, sebutkan menu dari berbagai kantin yang sesuai dengan keyword tersebut
-5. Jika user menyebutkan "MAKANAN TERMAHAL", sebutkan menu termahal dari berbagai kantin (bisa berbeda kantin)
-6. Jika user menyebutkan "MAKANAN PALING SERING DIBELI" atau "best seller", sebutkan menu dengan total_sold tertinggi dari berbagai kantin
-7. Jika user menyebutkan "ALERGI" atau "tidak bisa makan" sesuatu, JANGAN PERNAH sebutkan menu yang mengandung bahan tersebut
-8. Jika user menanyakan "MAKANAN", JANGAN sebutkan minuman
-9. Jika user menanyakan "MINUMAN", JANGAN sebutkan makanan
-10. Jika user menyebutkan kantin spesifik, fokuskan rekomendasi dari kantin tersebut
-11. Jika user TIDAK menyebutkan kantin spesifik, berikan rekomendasi dari BERBAGAI KANTIN yang berbeda
-12. Selalu SEBUTKAN NAMA KANTIN ketika merekomendasikan menu (contoh: "Nasi Goreng dari Kantin Sate Ayam")
-13. Jika tidak ada menu yang cocok dengan kriteria, berikan alternatif atau saran
-14. Selalu akhiri dengan tawaran bantuan tambahan
-15. Gunakan bahasa sehari-hari yang sopan dan ramah
+ATURAN KHUSUS:
+- Jika ada budget, hanya rekomendasikan menu sesuai budget tersebut
+- Jika ada keywords hindari, jangan sebutkan menu yang mengandung bahan tersebut
+- Jika user minta jumlah spesifik (1 menu, 2 menu), patuhi jumlah tersebut
+- Jika user tanya makanan, jangan sebutkan minuman (dan sebaliknya)
+- Selalu sebutkan nama kantin untuk setiap menu
+- Untuk kondisi kesehatan: diabetes → hindari manis/gula, kolesterol → hindari goreng/santan
 
-Contoh jawaban yang baik (multi-kantin):
-- "Untuk budget 10 ribu, saya rekomendasikan Klepon dari Kantin Sate Ayam Betawi seharga 5 ribu, atau Jus Apel dari Kantin Aneka Jus Segar seharga 5 ribu. Keduanya dari kantin berbeda dan enak banget! Bagaimana, tertarik mencoba salah satunya?"
-- "Menu termahal dari berbagai kantin: Ayam Bakar Premium dari Kantin Sate Ayam Betawi seharga Rp25.000, dan Rendang Spesial dari Kantin Nasi Padang seharga Rp30.000. Yang mana yang kamu mau?"
-- "Menu paling sering dibeli dari berbagai kantin: Nasi Goreng Spesial dari Kantin A sudah terjual 250+ kali, dan Ayam Bakar Madu dari Kantin B sudah terjual 180+ kali!"
+CONTOH JAWABAN:
+User: "Selamat pagi"
+AI: "Selamat pagi! 👋 Ada yang bisa saya bantu terkait kuliner Anda hari ini di E-Kantin?"
 
-IMPORTANT: 
-- Jika user TIDAK menyebutkan kantin spesifik, SELALU sebutkan menu dari BERBAGAI KANTIN yang berbeda!
-- Jika user menyebutkan budget, JANGAN sebutkan menu yang harganya melebihi budget tersebut!
-- Jika user menyebutkan alergi, JANGAN sebutkan menu yang mengandung bahan alergen tersebut!
-- SELALU SEBUTKAN NAMA KANTIN ketika merekomendasikan menu!
+User: "Aku punya 20 ribu, bisa makan apa?"
+AI: "Dengan budget Rp20.000, kamu bisa coba Nasi Goreng Ayam dari Kantin Pak Joko seharga Rp15.000 atau Mie Rebus Spesial dari Kantin Bu Ani seharga Rp12.000. 😊 Mau coba yang mana?"
+
+User: "Aku alergi udang, ada menu lain?"
+AI: "Oke, untuk yang tanpa udang ada Sate Ayam dari Kantin Mas Budi seharga Rp16.000 atau Nasi Goreng dari Kantin Pak Joko seharga Rp15.000. Semua aman dari udang! 😊"
+
+User: "Menu termurah apa?"
+AI: "Menu termurah adalah Kue Nagasari dari Kantin Aneka Jajan seharga Rp2.000. Murah meriah! 💰 Mau coba?"
+
+PRINSIP UTAMA:
+1. Pahami pertanyaan user → identifikasi intent (cari menu, tanya harga, minta rekomendasi, dll).
+2. Tentukan apakah perlu memanggil tool atau cukup menjawab langsung.
+3. Jika perlu data → gunakan data yang sudah disediakan di atas.
+4. Setelah mendapat data → susun jawaban alami dan singkat.
+5. Gunakan jumlah menu sesuai permintaan user.
+6. Jika tidak ada hasil → berikan alasan dan tawarkan bantuan lanjut.
 
 User: ${message}
 Assistant:`
 
-    // Use Gemini API directly
+    // Use Gemini API directly with fetch
+    console.log('Calling Gemini API directly with fetch...')
+    
     const requestBody = {
       contents: [{
         parts: [{
@@ -104,7 +124,7 @@ Assistant:`
     }
 
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -114,6 +134,8 @@ Assistant:`
       }
     )
 
+    console.log('Gemini API response status:', geminiResponse.status)
+
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text()
       console.error('Gemini API Error:', errorText)
@@ -121,18 +143,28 @@ Assistant:`
     }
 
     const data = await geminiResponse.json()
+    console.log('Gemini API response data:', data)
     
     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
       console.error('Invalid Gemini response structure:', data)
       throw new Error('Invalid response from Gemini API')
     }
 
-    const aiResponse = data.candidates[0].content.parts[0].text
+    let aiResponse = data.candidates[0].content.parts[0].text
+    console.log('AI Response extracted:', aiResponse)
 
     console.log('AI Response from Gemini:', aiResponse)
 
+    // Clean response dari markdown formatting
+    aiResponse = aiResponse.replace(/\*\*(.*?)\*\*/g, '$1')
+    aiResponse = aiResponse.replace(/\*(.*?)\*/g, '$1').replace(/_(.*?)_/g, '$1')
+    aiResponse = aiResponse.replace(/```[\s\S]*?```/g, '')
+    aiResponse = aiResponse.replace(/`(.*?)`/g, '$1')
+    aiResponse = aiResponse.replace(/^#{1,6}\s+/gm, '')
+    aiResponse = aiResponse.trim()
+
     return NextResponse.json({
-      response: aiResponse.trim(),
+      response: aiResponse,
       api: 'Gemini'
     })
 
