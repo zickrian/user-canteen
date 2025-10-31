@@ -126,9 +126,12 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     }
   }
 
-  const handleAddToCart = (menu: Menu) => {
-    if (kantin) {
-      addItem(menu, kantin)
+  const handleAddToCart = (menu: Menu, menuKantin?: Kantin) => {
+    // Gunakan kantin dari parameter (untuk menu global) atau kantin dari props
+    const targetKantin = menuKantin || kantin
+    
+    if (targetKantin) {
+      addItem(menu, targetKantin)
 
       const confirmationMessage: AIMessage = {
         id: Date.now().toString(),
@@ -138,11 +141,11 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       }
       setMessages((prev) => [...prev, confirmationMessage])
     } else {
-      // Jika ini adalah menu global, beri tahu user untuk memilih kantin terlebih dahulu
+      // Jika tidak ada data kantin sama sekali
       const errorMessage: AIMessage = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `⚠️ Menu "${menu.nama_menu}" dari kantin "${(menu as any).kantin?.nama_kantin || 'Unknown'}" tidak bisa ditambahkan langsung. Silakan buka halaman kantin terlebih dahulu untuk melakukan pemesanan.`,
+        content: `⚠️ Terjadi kesalahan, data kantin tidak lengkap. Silakan coba lagi.`,
         timestamp: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, errorMessage])
@@ -173,29 +176,30 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
               <div className="flex-1 min-w-0">
                 <h4 className="font-semibold text-sm text-black flex items-center gap-2 flex-wrap">
                   <span className="truncate">{menu.nama_menu}</span>
-                  {menu.total_sold && menu.total_sold > 10 && (
+                  {(menu.total_sold && menu.total_sold > 10) ? (
                     <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full whitespace-nowrap">
                       🔥 Populer
                     </span>
-                  )}
+                  ) : null}
                 </h4>
                 
-                {isGlobalMenu && kantinInfo && (
+                {isGlobalMenu && kantinInfo ? (
                   <p className="text-xs text-blue-600 mt-1 font-medium">
                     🏪 {kantinInfo.nama_kantin}
                   </p>
-                )}
+                ) : null}
                 
-                {menu.deskripsi && (
+                {menu.deskripsi ? (
                   <p className="text-xs text-gray-600 mt-1 line-clamp-2">
                     {menu.deskripsi}
                   </p>
-                )}
+                ) : null}
+                
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <p className="text-sm font-bold text-black">
                     {formatPrice(menu.harga)}
                   </p>
-                  {menu.kategori_menu && menu.kategori_menu.length > 0 && (
+                  {menu.kategori_menu && menu.kategori_menu.length > 0 ? (
                     <div className="flex gap-1 flex-wrap">
                       {menu.kategori_menu.slice(0, 2).map((cat, idx) => (
                         <span
@@ -206,27 +210,24 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
                         </span>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
               <div className="flex flex-col gap-1 shrink-0">
-                {isGlobalMenu ? (
-                  <button
-                    onClick={() => {
-                      window.location.href = `/kantin/${kantinInfo.id}`;
-                    }}
-                    className="bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors whitespace-nowrap"
-                  >
-                    Lihat Kantin
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleAddToCart(menu)}
-                    className="bg-black text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors whitespace-nowrap"
-                  >
-                    <span>+</span> Tambah
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    if (isGlobalMenu && kantinInfo) {
+                      // Untuk menu global, gunakan data kantin dari menu
+                      handleAddToCart(menu, kantinInfo);
+                    } else {
+                      // Untuk menu kantin saat ini
+                      handleAddToCart(menu);
+                    }
+                  }}
+                  className="bg-black text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors whitespace-nowrap"
+                >
+                  + Tambah
+                </button>
               </div>
             </div>
           </div>
