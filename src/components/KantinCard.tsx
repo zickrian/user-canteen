@@ -34,7 +34,7 @@ export default function KantinCard({ kantin }: KantinCardProps) {
   return (
     <Link 
       href={`/kantin/${kantin.id}`}
-      className="block border-2 border-black rounded-2xl overflow-hidden hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-300 bg-white group"
+      className="block bg-white rounded-2xl overflow-hidden transition-all duration-300 group shadow-md hover:shadow-xl hover:shadow-black/10"
     >
       <div className="relative w-full h-32 bg-gray-100">
         {kantin.foto_profil ? (
@@ -53,44 +53,44 @@ export default function KantinCard({ kantin }: KantinCardProps) {
         
         {/* Status Badge */}
         <div className="absolute top-2 right-2">
-          <span className={`px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap shadow-sm ${
             kantin.buka_tutup && kantin.status === 'aktif'
-              ? 'bg-green-500 text-white'
-              : 'bg-red-500 text-white'
+              ? 'bg-green-500 text-white shadow-green-500/25'
+              : 'bg-red-500 text-white shadow-red-500/25'
           }`}>
             {kantin.buka_tutup && kantin.status === 'aktif' ? 'BUKA' : 'TUTUP'}
           </span>
         </div>
       </div>
       
-      <div className="p-3">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <h3 className="text-base font-bold text-black line-clamp-1 group-hover:text-gray-700 transition-colors">
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <h3 className="text-lg font-bold text-black line-clamp-1 group-hover:text-gray-700 transition-colors">
             {kantin.nama_kantin}
           </h3>
         </div>
 
         {/* Rating */}
         {(kantin.avg_rating && kantin.total_ratings && kantin.total_ratings > 0) ? (
-          <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center">
               {renderStars(kantin.avg_rating)}
             </div>
-            <span className="text-xs text-gray-600">
+            <span className="text-sm text-gray-600 font-medium">
               {kantin.avg_rating.toFixed(1)} ({kantin.total_ratings})
             </span>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-xs text-gray-500">Belum memiliki rating</span>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm text-gray-500">Belum memiliki rating</span>
           </div>
         )}
 
         {/* Operating Hours */}
         {kantin.jam_buka && kantin.jam_tutup && (
-          <div className="flex items-center gap-1.5 text-gray-600">
-            <Clock className="h-3 w-3" />
-            <span className="text-xs">
+          <div className="flex items-center gap-2 text-gray-600">
+            <Clock className="h-4 w-4" />
+            <span className="text-sm font-medium">
               {kantin.jam_buka} - {kantin.jam_tutup}
             </span>
           </div>

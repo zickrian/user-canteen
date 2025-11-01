@@ -23,6 +23,18 @@ import {
   rpcGetPopularMenusGlobal,
   rpcGetNewMenusGlobal,
   rpcGetAllMenusGlobal,
+  // Kantin info functions
+  rpcGetKantinInfo,
+  rpcGetAllKantins,
+  rpcSearchKantins,
+  // Category functions
+  rpcGetMakananByCategory,
+  rpcGetMinumanByCategory,
+  rpcGetBestMealCombo,
+  rpcGetRecommendationsByTime,
+  rpcGetFallbackMenus,
+  rpcGetMenusUnder10k,
+  rpcGetHealthyMenus,
 } from '@/lib/aiTools';
 
 // Initialize the client. The SDK automatically picks up the GEMINI_API_KEY from .env.local
@@ -188,6 +200,66 @@ export async function generateContent(prompt: string, kantinId: string) {
             }
             break
 
+          // Kantin info functions
+          case 'getKantinInfo':
+            toolResult = await rpcGetKantinInfo((args as any).kantinId)
+            break
+
+          case 'getAllKantins':
+            toolResult = await rpcGetAllKantins()
+            break
+
+          case 'searchKantins':
+            toolResult = await rpcSearchKantins((args as any).keywords || [])
+            break
+
+          // Category functions
+          case 'getMakananByCategory':
+            toolResult = await rpcGetMakananByCategory(
+              (args as any).category,
+              (args as any).limit
+            )
+            break
+
+          case 'getMinumanByCategory':
+            toolResult = await rpcGetMinumanByCategory((args as any).limit)
+            break
+
+          case 'getHealthyMenus':
+
+          case 'getBestMealCombo':
+            toolResult = await rpcGetBestMealCombo(
+              Number((args as any).budget),
+              (args as any).timeOfDay,
+              (args as any).limit ?? 3
+            )
+            break
+
+          case 'getRecommendationsByTime':
+            toolResult = await rpcGetRecommendationsByTime(
+              (args as any).timeOfDay,
+              (args as any).limit
+            )
+            break
+
+          case 'getFallbackMenus':
+            toolResult = await rpcGetFallbackMenus(
+              kantinId,
+              (args as any).limit
+            )
+            break
+
+          case 'getMenusUnder10k':
+            toolResult = await rpcGetMenusUnder10k(
+              (args as any).limit
+            )
+            break
+            toolResult = await rpcGetHealthyMenus(
+              (args as any).keywords || [],
+              (args as any).limit
+            )
+            break
+
           default:
             console.warn('Unknown tool:', toolCall.name)
             toolResult = { error: 'Tool tidak dikenal' }
@@ -248,15 +320,65 @@ export async function generateContent(prompt: string, kantinId: string) {
       // Bersihkan markdown formatting
       text = cleanMarkdown(text);
 
+      // Validasi: Pastikan menuData selalu dikembalikan jika tool berhasil
+      let finalMenuData = toolResult;
+      if (Array.isArray(toolResult) && toolResult.length === 0) {
+        // Jika array kosong, coba fallback ke getAllMenus
+        console.log('Tool returned empty array, trying fallback...');
+        try {
+          if (kantinId) {
+            finalMenuData = await rpcGetAllMenus(kantinId, 5);
+          } else {
+            finalMenuData = await rpcGetAllMenusGlobal(5);
+          }
+          console.log('Fallback successful, got', finalMenuData?.length || 0, 'menus');
+        } catch (fallbackError) {
+          console.error('Fallback failed:', fallbackError);
+          finalMenuData = toolResult; // Kembali ke hasil asli
+        }
+      }
+
       return {
         response: text,
         toolUsed: toolCall.name,
-        menuData: toolResult,
+        menuData: finalMenuData,
       };
     }
 
-    // STEP 4: Jika tidak ada tool call, ambil text response langsung
-    console.log('No tool call, returning direct response')
+    // STEP 4: Jika tidak ada tool call, cek apakah ini pertanyaan tentang menu
+    console.log('No tool call, checking if menu-related question...')
+    
+    // Deteksi pertanyaan tentang menu
+    const menuKeywords = ['menu', 'makanan', 'minuman', 'makan', 'minum', 'sarapan', 'makan siang', 'makan malam', 'jajanan', 'snack', 'dessert', 'jus', 'teh', 'kopi', 'segari', 'enak', 'murah', 'mahal', 'budget', 'harga', 'rekomendasi', 'pilihan', 'ada apa', 'tersedia'];
+    const isMenuRelated = menuKeywords.some(keyword => 
+      prompt.toLowerCase().includes(keyword.toLowerCase())
+    );
+
+    if (isMenuRelated) {
+      console.log('Menu-related question detected, using fallback...')
+      // Fallback: tampilkan beberapa menu populer
+      try {
+        let fallbackData;
+        if (kantinId) {
+          fallbackData = await rpcGetPopularMenus(kantinId, 5);
+        } else {
+          fallbackData = await rpcGetPopularMenusGlobal(5);
+        }
+        
+        let text = firstResponse.text() || 'Maaf, tidak ada jawaban.';
+        text = cleanMarkdown(text);
+        
+        return {
+          response: text + '\n\nBerikut beberapa menu yang mungkin kamu suka:',
+          toolUsed: 'fallback-popular',
+          menuData: fallbackData,
+        };
+      } catch (fallbackError) {
+        console.error('Fallback failed:', fallbackError);
+      }
+    }
+
+    // Jika bukan pertanyaan menu, kembalikan response langsung
     let text = firstResponse.text() || 'Maaf, tidak ada jawaban.'
     text = cleanMarkdown(text)
 

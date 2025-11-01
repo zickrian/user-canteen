@@ -447,3 +447,423 @@ export async function rpcGetAllMenus(
   
   return limit ? data?.slice(0, limit) : data
 }
+
+/**
+ * Ambil informasi detail kantin
+ */
+export async function rpcGetKantinInfo(kantinId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('kantin')
+    .select(`
+      *,
+      menu:menu (
+        id,
+        nama_menu,
+        harga,
+        kategori_menu,
+        total_sold,
+        tersedia
+      )
+    `)
+    .eq('id', kantinId)
+    .single()
+  
+  if (error) {
+    console.error('Error getting kantin info:', error)
+    throw error
+  }
+  
+  return data
+}
+
+/**
+ * Ambil semua kantin yang aktif
+ */
+export async function rpcGetAllKantins() {
+  const { data, error } = await supabaseAdmin
+    .from('kantin')
+    .select(`
+      *,
+      menu:menu (
+        id,
+        nama_menu,
+        harga,
+        kategori_menu,
+        total_sold,
+        tersedia
+      )
+    `)
+    .eq('status', 'aktif')
+    .order('nama_kantin')
+  
+  if (error) {
+    console.error('Error getting all kantins:', error)
+    throw error
+  }
+  
+  return data
+}
+
+/**
+ * Cari kantin berdasarkan nama atau keywords
+ */
+export async function rpcSearchKantins(keywords: string[]) {
+  const { data, error } = await supabaseAdmin
+    .from('kantin')
+    .select(`
+      *,
+      menu:menu (
+        id,
+        nama_menu,
+        harga,
+        kategori_menu,
+        total_sold,
+        tersedia
+      )
+    `)
+    .eq('status', 'aktif')
+    .or(
+      keywords.map(keyword => 
+        `nama_kantin.ilike.%${keyword}%,deskripsi.ilike.%${keyword}%`
+      ).join(',')
+    )
+    .order('nama_kantin')
+  
+  if (error) {
+    console.error('Error searching kantins:', error)
+    throw error
+  }
+  
+  return data
+}
+
+/**
+ * Ambil menu berdasarkan kategori makanan (sarapan, makan siang, snack)
+ */
+export async function rpcGetMakananByCategory(
+  category: string, 
+  limit?: number
+) {
+  // Ambil semua menu yang tersedia
+  const { data, error } = await supabaseAdmin
+    .from('menu')
+    .select(`
+      *,
+      kantin:kantin_id (
+        id,
+        nama_kantin,
+        status
+      )
+    `)
+    .eq('tersedia', true)
+    .order('total_sold', { ascending: false })
+    .limit(50) // Ambil banyak untuk di-filter
+  
+  if (error) {
+    console.error('Error getting makanan by category:', error)
+    throw error
+  }
+  
+  // Filter: HANYA makanan, BUKAN minuman/snack/jajanan/dessert
+  const filtered = data?.filter(menu => {
+    const categories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+    
+    // EXCLUDE minuman, snack, jajanan, dessert
+    const excludeCategories = ['minuman', 'snack', 'jajanan', 'dessert','jajan']
+    const hasExcluded = categories.some((cat: string) => excludeCategories.includes(cat))
+    
+    // Jika ada kategori excluded, skip
+    if (hasExcluded) return false
+    
+    // Jika kategori kosong atau hanya punya kategori makanan, ambil
+    return true
+  })
+  
+  // Limit hasil sesuai parameter
+  return filtered?.slice(0, limit || 10)
+}
+
+/**
+ * Ambil menu berdasarkan kategori minuman
+ */
+export async function rpcGetMinumanByCategory(
+  limit?: number
+) {
+  const { data, error } = await supabaseAdmin
+    .from('menu')
+    .select(`
+      *,
+      kantin:kantin_id (
+        id,
+        nama_kantin,
+        status
+      )
+    `)
+    .eq('tersedia', true)
+    .contains('kategori_menu', ['minuman'])
+    .order('total_sold', { ascending: false })
+    .limit(limit || 10)
+  
+  if (error) {
+    console.error('Error getting minuman by category:', error)
+    throw error
+  }
+  
+  return data
+}
+
+/**
+ * Ambil menu makanan sehat (untuk kondisi kesehatan tertentu)
+ */
+export async function rpcGetHealthyMenus(
+  keywords: string[], 
+  limit?: number
+) {
+  const { data, error } = await supabaseAdmin
+    .from('menu')
+    .select(`
+      *,
+      kantin:kantin_id (
+        id,
+        nama_kantin,
+        status
+      )
+    `)
+    .eq('tersedia', true)
+    .or(
+      keywords.map(keyword => 
+        `nama_menu.ilike.%${keyword}%,deskripsi.ilike.%${keyword}%`
+      ).join(',')
+    )
+    .order('total_sold', { ascending: false })
+    .limit(limit || 10)
+  
+  if (error) {
+    console.error('Error getting healthy menus:', error)
+    throw error
+  }
+  
+  return data
+}
+
+
+/**
+ * Ambil kombinasi makanan + minuman terbaik dalam budget
+ */
+export async function rpcGetBestMealCombo(
+  budget: number, 
+  timeOfDay?: 'pagi' | 'siang' | 'malam',
+  limit?: number
+) {
+  try {
+    // Ambil semua menu yang tersedia
+    const { data: allMenus, error } = await supabaseAdmin
+      .from('menu')
+      .select(`
+        *,
+        kantin:kantin_id (
+          id,
+          nama_kantin,
+          status
+        )
+      `)
+      .eq('tersedia', true)
+      .lte('harga', budget)
+      .order('total_sold', { ascending: false })
+      .limit(50) // Ambil banyak untuk kombinasi
+    
+    if (error) {
+      console.error('Error getting menus for combo:', error)
+      throw error
+    }
+    
+    // Filter makanan dan minuman
+    const makananList = allMenus?.filter(menu => {
+      const categories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+      const excludeCategories = ['minuman', 'snack', 'jajanan', 'dessert', 'jajan']
+      return !categories.some((cat: string) => excludeCategories.includes(cat))
+    }) || []
+    
+    const minumanList = allMenus?.filter(menu => {
+      const categories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+      return categories.includes('minuman')
+    }) || []
+    
+    // Filter berdasarkan waktu jika ditentukan
+    let filteredMakanan = makananList
+    if (timeOfDay) {
+      filteredMakanan = makananList.filter(menu => {
+        const categories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+        switch (timeOfDay) {
+          case 'pagi':
+            return categories.includes('sarapan') || categories.includes('makanan berat')
+          case 'siang':
+            return categories.includes('makan siang') || categories.includes('makanan berat')
+          case 'malam':
+            return categories.includes('makan malam') || categories.includes('makanan berat')
+          default:
+            return true
+        }
+      })
+    }
+    
+    // Jika tidak ada makanan sesuai waktu, gunakan semua makanan
+    if (filteredMakanan.length === 0) {
+      filteredMakanan = makananList
+    }
+    
+    // Cari kombinasi terbaik
+    const bestCombos: any[] = []
+    
+    for (const makanan of filteredMakanan.slice(0, 10)) {
+      for (const minuman of minumanList.slice(0, 10)) {
+        const total = makanan.harga + minuman.harga
+        if (total <= budget) {
+          // Hitung score berdasarkan popularitas dan harga
+          const score = (makanan.total_sold || 0) + (minuman.total_sold || 0) - (total / 1000)
+          bestCombos.push({
+            makanan,
+            minuman,
+            total,
+            score,
+            sisa: budget - total
+          })
+        }
+      }
+    }
+    
+    // Sort by score tertinggi dan sisa budget terkecil (optimal)
+    bestCombos.sort((a, b) => {
+      if (Math.abs(a.score - b.score) < 10) {
+        return a.sisa - b.sisa // Prioritaskan yang lebih hemat
+      }
+      return b.score - a.score
+    })
+    
+    return bestCombos.slice(0, limit || 5)
+  } catch (error) {
+    console.error('Error in rpcGetBestMealCombo:', error)
+    throw error
+  }
+}
+
+/**
+ * Ambil rekomendasi berdasarkan waktu (pagi/siang/malam)
+ */
+export async function rpcGetRecommendationsByTime(
+  timeOfDay: 'pagi' | 'siang' | 'malam',
+  limit?: number
+) {
+  try {
+    let targetCategories: string[] = []
+    
+    switch (timeOfDay) {
+      case 'pagi':
+        targetCategories = ['sarapan', 'makanan berat']
+        break
+      case 'siang':
+        targetCategories = ['makan siang', 'makanan berat']
+        break
+      case 'malam':
+        targetCategories = ['makan malam', 'makanan berat']
+        break
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from('menu')
+      .select(`
+        *,
+        kantin:kantin_id (
+          id,
+          nama_kantin,
+          status
+        )
+      `)
+      .eq('tersedia', true)
+      .or(
+        targetCategories.map(cat => `kategori_menu.cs.{${cat}}`).join(',')
+      )
+      .order('total_sold', { ascending: false })
+      .limit(limit || 10)
+    
+    if (error) {
+      console.error('Error getting time-based recommendations:', error)
+      throw error
+    }
+    
+    return data
+  } catch (error) {
+    console.error('Error in rpcGetRecommendationsByTime:', error)
+    throw error
+  }
+}
+
+/**
+ * Fallback function - ambil menu terpopuler jika pencarian gagal
+ */
+export async function rpcGetFallbackMenus(
+  kantinId?: string,
+  limit?: number
+) {
+  try {
+    let query = supabaseAdmin
+      .from('menu')
+      .select(`
+        *,
+        kantin:kantin_id (
+          id,
+          nama_kantin,
+          status
+        )
+      `)
+      .eq('tersedia', true)
+      .order('total_sold', { ascending: false })
+      .limit(limit || 8)
+    
+    if (kantinId) {
+      query = query.eq('kantin_id', kantinId)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('Error getting fallback menus:', error)
+      throw error
+    }
+    
+    return data
+  } catch (error) {
+    console.error('Error in rpcGetFallbackMenus:', error)
+    throw error
+  }
+}
+
+/**
+ * Cari menu dengan harga di bawah 10000
+ */
+export async function rpcGetMenusUnder10k(
+  limit?: number
+) {
+  const { data, error } = await supabaseAdmin
+    .from('menu')
+    .select(`
+      *,
+      kantin:kantin_id (
+        id,
+        nama_kantin,
+        status
+      )
+    `)
+    .eq('tersedia', true)
+    .lte('harga', 10000)
+    .order('harga', { ascending: true })
+    .order('total_sold', { ascending: false })
+    .limit(limit || 15)
+  
+  if (error) {
+    console.error('Error getting menus under 10k:', error)
+    throw error
+  }
+  
+  return data
+}

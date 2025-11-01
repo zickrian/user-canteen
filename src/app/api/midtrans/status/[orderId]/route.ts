@@ -16,10 +16,10 @@ const snap = new MidtransClient.Snap({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
-    const { orderId } = params
+    const { orderId } = await params
 
     if (!orderId) {
       return NextResponse.json(

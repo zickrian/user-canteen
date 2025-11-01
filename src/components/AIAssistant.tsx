@@ -40,7 +40,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       const welcomeMessage: AIMessage = {
         id: '1',
         role: 'assistant',
-        content: `Halo! 👋 Saya asisten kuliner ${kantin?.nama_kantin || 'E-Kantin'}. Ada yang bisa saya bantu hari ini? 😊`,
+        content: `Halo! Mau cari menu apa? 😊`,
         timestamp: new Date().toISOString(),
       }
       setMessages([welcomeMessage])
@@ -51,28 +51,57 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     try {
       console.log('Calling AI action with:', { message: userMessage, kantinId })
       
-      // Import server action dynamically
-      const { generateContent } = await import('@/app/actions');
-      
-      // Call the server action directly
-      const data = await generateContent(userMessage, kantinId || '');
-      
-      console.log('AI Response data:', data)
-      
-      if (data.error) {
-        throw new Error(data.details || data.error);
-      }
-      
-      return {
-        message: data.response || 'Maaf, saya tidak bisa memproses permintaan kamu saat ini.',
-        menuData: data.menuData || null,
-        toolUsed: data.toolUsed || null,
+      // Coba gunakan server action dulu
+      try {
+        const { generateContent } = await import('@/app/actions');
+        const data = await generateContent(userMessage, kantinId || '');
+        
+        console.log('AI Response data:', data)
+        
+        if ('error' in data) {
+          throw new Error((data as any).details || (data as any).error);
+        }
+        
+        return {
+          message: (data as any).response || 'Maaf, saya tidak bisa memproses permintaan kamu saat ini.',
+          menuData: (data as any).menuData || null,
+          toolUsed: (data as any).toolUsed || null,
+        }
+      } catch (serverActionError: any) {
+        console.error('Server action failed, trying API route:', serverActionError)
+        
+        // Fallback ke API route jika server action gagal
+        const response = await fetch('/api/gemini/ask', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: userMessage,
+            kantinId: kantinId || null
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('API Response data:', data)
+        
+        return {
+          message: data.response || 'Maaf, saya tidak bisa memproses permintaan kamu saat ini.',
+          menuData: data.menuData || null,
+          toolUsed: data.toolUsed || null,
+        }
       }
     } catch (error: any) {
       console.error('Error generating AI response:', error)
       console.error('Error message:', error.message)
+      
+      // Return pesan error yang user-friendly
       return {
-        message: `Maaf, terjadi kesalahan: ${error.message || 'Silakan coba lagi'} 😅`,
+        message: `Maaf, saya sedang mengalami masalah teknis. Silakan coba lagi beberapa saat ya! 😅`,
         menuData: null,
         toolUsed: null,
       }
@@ -136,7 +165,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       const confirmationMessage: AIMessage = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `✅ "${menu.nama_menu}" telah ditambahkan ke keranjang! 🛒 Ada yang mau ditambah lagi?`,
+        content: `✅ ${menu.nama_menu} ditambahkan! Mau pesan lagi?`,
         timestamp: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, confirmationMessage])
@@ -145,7 +174,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       const errorMessage: AIMessage = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `⚠️ Terjadi kesalahan, data kantin tidak lengkap. Silakan coba lagi.`,
+        content: `⚠️ Gagal menambahkan. Coba lagi ya!`,
         timestamp: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, errorMessage])

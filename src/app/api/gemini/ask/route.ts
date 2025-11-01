@@ -18,6 +18,24 @@ import {
   rpcGetMenuCombos,
   rpcGetKantinStats,
   rpcGetAllMenus,
+  rpcGetKantinInfo,
+  rpcGetAllKantins,
+  rpcSearchKantins,
+  rpcGetMakananByCategory,
+  rpcGetNewMenusGlobal,
+  rpcGetMinumanByCategory,
+  rpcGetHealthyMenus,
+  rpcGetMenuByBudgetGlobal,
+  rpcSearchMenusGlobal,
+  rpcGetMenusByCategoryGlobal,
+  rpcGetCheapestMenusGlobal,
+  rpcGetBestValueMenusGlobal,
+  rpcGetPopularMenusGlobal,
+  rpcGetBestMealCombo,
+  rpcGetRecommendationsByTime,
+  rpcGetFallbackMenus,
+  rpcGetMenusUnder10k,
+  rpcGetAllMenusGlobal,
 } from '@/lib/aiTools'
 
 export const dynamic = 'force-dynamic'
@@ -49,9 +67,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (!kantinId || typeof kantinId !== 'string') {
+    // kantinId bisa kosong untuk global search
+    if (kantinId && typeof kantinId !== 'string') {
       return NextResponse.json(
-        { error: 'kantinId (string) wajib diisi' },
+        { error: 'kantinId harus string jika ada' },
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
@@ -80,7 +99,7 @@ export async function POST(req: NextRequest) {
             {
               role: 'user',
               parts: [
-                { text: `${SYSTEM_PROMPT}\n\nUser: ${message}\n\nKantin ID: ${kantinId}` }
+                { text: `${SYSTEM_PROMPT}\n\nUser: ${message}\n\nKantin ID: ${kantinId || 'global'}` }
               ],
             },
           ],
@@ -126,63 +145,213 @@ export async function POST(req: NextRequest) {
         // Eksekusi tool berdasarkan nama
         switch (toolCall.name) {
           case 'getMenusByBudget':
-            toolResult = await rpcGetMenuByBudget(
-              kantinId,
+            if (kantinId) {
+              toolResult = await rpcGetMenuByBudget(
+                kantinId,
+                Number(args.maxBudget),
+                args.limit
+              )
+            } else {
+              toolResult = await rpcGetMenuByBudgetGlobal(
+                Number(args.maxBudget),
+                args.limit
+              )
+            }
+            break
+
+          case 'searchMenus':
+            if (kantinId) {
+              toolResult = await rpcSearchMenus(
+                kantinId,
+                args.keywords || [],
+                args.limit
+              )
+            } else {
+              toolResult = await rpcSearchMenusGlobal(
+                args.keywords || [],
+                args.limit
+              )
+            }
+            break
+
+          case 'getMenusByCategory':
+            if (kantinId) {
+              toolResult = await rpcGetMenusByCategory(
+                kantinId,
+                args.category,
+                args.limit
+              )
+            } else {
+              toolResult = await rpcGetMenusByCategoryGlobal(
+                args.category,
+                args.limit
+              )
+            }
+            break
+
+          case 'getCheapestMenus':
+            if (kantinId) {
+              toolResult = await rpcGetCheapestMenus(kantinId, args.limit ?? 5)
+            } else {
+              toolResult = await rpcGetCheapestMenusGlobal(args.limit ?? 5)
+            }
+            break
+
+          case 'getBestValueMenus':
+            if (kantinId) {
+              toolResult = await rpcGetBestValueMenus(kantinId, args.limit ?? 5)
+            } else {
+              toolResult = await rpcGetBestValueMenusGlobal(args.limit ?? 5)
+            }
+            break
+
+          case 'getPopularMenus':
+            if (kantinId) {
+              toolResult = await rpcGetPopularMenus(kantinId, args.limit ?? 5)
+            } else {
+              toolResult = await rpcGetPopularMenusGlobal(args.limit ?? 5)
+            }
+            break
+
+          case 'getNewMenus':
+            if (kantinId) {
+              toolResult = await rpcGetNewMenus(
+                kantinId,
+                args.daysAgo ?? 30,
+                args.limit ?? 10
+              )
+            } else {
+              toolResult = await rpcGetNewMenusGlobal(
+                args.daysAgo ?? 30,
+                args.limit ?? 10
+              )
+            }
+            break
+
+          case 'getMenuCombos':
+            if (kantinId) {
+              toolResult = await rpcGetMenuCombos(
+                kantinId,
+                Number(args.budget),
+                args.limit ?? 10
+              )
+            } else {
+              toolResult = { error: 'Menu combos hanya tersedia untuk kantin spesifik' }
+            }
+            break
+
+          case 'getKantinStats':
+            if (kantinId) {
+              toolResult = await rpcGetKantinStats(kantinId)
+            } else {
+              toolResult = { error: 'Kantin stats hanya tersedia untuk kantin spesifik' }
+            }
+            break
+
+          case 'getAllMenus':
+            if (kantinId) {
+              toolResult = await rpcGetAllMenus(kantinId, args.limit)
+            } else {
+              toolResult = await rpcGetAllMenusGlobal(args.limit)
+            }
+            break
+
+          // Global functions (tanpa kantinId)
+          case 'getMenusByBudgetGlobal':
+            toolResult = await rpcGetMenuByBudgetGlobal(
               Number(args.maxBudget),
               args.limit
             )
             break
 
-          case 'searchMenus':
-            toolResult = await rpcSearchMenus(
-              kantinId,
+          case 'searchMenusGlobal':
+            toolResult = await rpcSearchMenusGlobal(
               args.keywords || [],
               args.limit
             )
             break
 
-          case 'getMenusByCategory':
-            toolResult = await rpcGetMenusByCategory(
-              kantinId,
+          case 'getMenusByCategoryGlobal':
+            toolResult = await rpcGetMenusByCategoryGlobal(
               args.category,
               args.limit
             )
             break
 
-          case 'getCheapestMenus':
-            toolResult = await rpcGetCheapestMenus(kantinId, args.limit ?? 5)
+          case 'getCheapestMenusGlobal':
+            toolResult = await rpcGetCheapestMenusGlobal(args.limit ?? 5)
             break
 
-          case 'getBestValueMenus':
-            toolResult = await rpcGetBestValueMenus(kantinId, args.limit ?? 5)
+          case 'getBestValueMenusGlobal':
+            toolResult = await rpcGetBestValueMenusGlobal(args.limit ?? 5)
             break
 
-          case 'getPopularMenus':
-            toolResult = await rpcGetPopularMenus(kantinId, args.limit ?? 5)
+          case 'getPopularMenusGlobal':
+            toolResult = await rpcGetPopularMenusGlobal(args.limit ?? 5)
             break
 
-          case 'getNewMenus':
-            toolResult = await rpcGetNewMenus(
-              kantinId,
-              args.daysAgo ?? 30,
-              args.limit ?? 10
+          case 'getAllMenusGlobal':
+            toolResult = await rpcGetAllMenusGlobal(args.limit)
+            break
+
+          // Kantin info functions
+          case 'getKantinInfo':
+            toolResult = await rpcGetKantinInfo(args.kantinId)
+            break
+
+          case 'getAllKantins':
+            toolResult = await rpcGetAllKantins()
+            break
+
+          case 'searchKantins':
+            toolResult = await rpcSearchKantins(args.keywords || [])
+            break
+
+          // Category functions
+          case 'getMakananByCategory':
+            toolResult = await rpcGetMakananByCategory(
+              args.category,
+              args.limit
             )
             break
 
-          case 'getMenuCombos':
-            toolResult = await rpcGetMenuCombos(
-              kantinId,
+          case 'getMinumanByCategory':
+            toolResult = await rpcGetMinumanByCategory(args.limit)
+            break
+
+          case 'getHealthyMenus':
+            toolResult = await rpcGetHealthyMenus(
+              args.keywords || [],
+              args.limit
+            )
+            break
+
+          case 'getBestMealCombo':
+            toolResult = await rpcGetBestMealCombo(
               Number(args.budget),
-              args.limit ?? 10
+              args.timeOfDay,
+              args.limit ?? 3
             )
             break
 
-          case 'getKantinStats':
-            toolResult = await rpcGetKantinStats(kantinId)
+          case 'getRecommendationsByTime':
+            toolResult = await rpcGetRecommendationsByTime(
+              args.timeOfDay,
+              args.limit
+            )
             break
 
-          case 'getAllMenus':
-            toolResult = await rpcGetAllMenus(kantinId, args.limit)
+          case 'getFallbackMenus':
+            toolResult = await rpcGetFallbackMenus(
+              kantinId,
+              args.limit
+            )
+            break
+
+          case 'getMenusUnder10k':
+            toolResult = await rpcGetMenusUnder10k(
+              args.limit
+            )
             break
 
           default:
@@ -212,7 +381,7 @@ export async function POST(req: NextRequest) {
               {
                 role: 'user',
                 parts: [
-                  { text: `${SYSTEM_PROMPT}\n\nUser: ${message}\n\nKantin ID: ${kantinId}` }
+                  { text: `${SYSTEM_PROMPT}\n\nUser: ${message}\n\nKantin ID: ${kantinId || 'global'}` }
                 ],
               },
               {
@@ -263,17 +432,71 @@ export async function POST(req: NextRequest) {
       // Bersihkan markdown formatting
       text = cleanMarkdown(text)
 
+      // Validasi: Pastikan menuData selalu dikembalikan jika tool berhasil
+      let finalMenuData = toolResult;
+      if (Array.isArray(toolResult) && toolResult.length === 0) {
+        // Jika array kosong, coba fallback ke getAllMenus
+        console.log('Tool returned empty array, trying fallback...');
+        try {
+          if (kantinId) {
+            finalMenuData = await rpcGetAllMenus(kantinId, 5);
+          } else {
+            finalMenuData = await rpcGetAllMenusGlobal(5);
+          }
+          console.log('Fallback successful, got', finalMenuData?.length || 0, 'menus');
+        } catch (fallbackError) {
+          console.error('Fallback failed:', fallbackError);
+          finalMenuData = toolResult; // Kembali ke hasil asli
+        }
+      }
+
       return NextResponse.json(
         {
           response: text,
           toolUsed: toolCall.name,
-          menuData: toolResult,
+          menuData: finalMenuData,
         },
         { headers: { 'Content-Type': 'application/json' } }
       )
     }
 
-    // STEP 4: Jika tidak ada tool call, ambil text response langsung
+    // STEP 4: Jika tidak ada tool call, cek apakah ini pertanyaan tentang menu
+    console.log('No tool call, checking if menu-related question...')
+    
+    // Deteksi pertanyaan tentang menu
+    const menuKeywords = ['menu', 'makanan', 'minuman', 'makan', 'minum', 'sarapan', 'makan siang', 'makan malam', 'jajanan', 'snack', 'dessert', 'jus', 'teh', 'kopi', 'segari', 'enak', 'murah', 'mahal', 'budget', 'harga', 'rekomendasi', 'pilihan', 'ada apa', 'tersedia'];
+    const isMenuRelated = menuKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword.toLowerCase())
+    );
+
+    if (isMenuRelated) {
+      console.log('Menu-related question detected, using fallback...')
+      // Fallback: tampilkan beberapa menu populer
+      try {
+        let fallbackData;
+        if (kantinId) {
+          fallbackData = await rpcGetPopularMenus(kantinId, 5);
+        } else {
+          fallbackData = await rpcGetPopularMenusGlobal(5);
+        }
+        
+        let text = parts?.[0]?.text || 'Maaf, tidak ada jawaban.';
+        text = cleanMarkdown(text);
+        
+        return NextResponse.json(
+          {
+            response: text + '\n\nBerikut beberapa menu yang mungkin kamu suka:',
+            toolUsed: 'fallback-popular',
+            menuData: fallbackData,
+          },
+          { headers: { 'Content-Type': 'application/json' } }
+        )
+      } catch (fallbackError) {
+        console.error('Fallback failed:', fallbackError);
+      }
+    }
+
+    // Jika bukan pertanyaan menu, kembalikan response langsung
     console.log('No tool call, returning direct response')
     let text = parts?.[0]?.text || 'Maaf, tidak ada jawaban.'
     text = cleanMarkdown(text)
@@ -313,4 +536,3 @@ function cleanMarkdown(text: string): string {
     .replace(/^#{1,6}\s+/gm, '') // headers
     .trim()
 }
-
