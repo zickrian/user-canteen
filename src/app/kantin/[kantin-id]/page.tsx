@@ -49,7 +49,6 @@ export default function KantinDetailPage() {
           .from('menu')
           .select('*')
           .eq('kantin_id', kantinId)
-          .eq('tersedia', true)
           .order('created_at', { ascending: false })
 
         if (menusError) {

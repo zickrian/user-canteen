@@ -43,7 +43,6 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
           .from('menu')
           .select('*')
           .in('kantin_id', kantinsData?.map(k => k.id) || [])
-          .eq('tersedia', true)
           .order('created_at', { ascending: false })
 
         if (menusError) {
@@ -215,7 +214,6 @@ export function useMenuData() {
           .from('menu')
           .select('*')
           .in('kantin_id', kantinsData?.map(k => k.id) || [])
-          .eq('tersedia', true)
 
         setKantins(kantinsData || [])
         setMenus(menusData || [])

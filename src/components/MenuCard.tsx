@@ -75,7 +75,7 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
           {!menu.tersedia && (
             <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
               <span className="bg-red-500 text-white px-3 py-1 rounded-lg text-sm font-bold shadow">
-                Tidak Tersedia
+              Sudah Habis
               </span>
             </div>
           )}

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { MessageCircle, Send, X, Bot, User, Sparkles } from 'lucide-react'
+import Image from 'next/image'
+import { Send, X, User } from 'lucide-react'
 import { Menu, Kantin } from '@/lib/supabase'
 import { useCart } from '@/contexts/CartContext'
 
@@ -269,16 +270,19 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition-all duration-300 z-50 group"
+        className="fixed bottom-6 right-6 p-2 transition-transform duration-300 hover:scale-105 z-50"
         aria-label="Buka AI Assistant"
       >
-        <div className="relative">
-          <MessageCircle className="h-6 w-6" />
-          <Sparkles className="h-3 w-3 absolute -top-1 -right-1 text-yellow-400" />
+        <div className="relative h-12 w-12">
+          <Image
+            src="/ang.png"
+            alt="AI Assistant"
+            fill
+            sizes="48px"
+            className="object-contain drop-shadow-lg"
+            priority={false}
+          />
         </div>
-        <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-800 text-white px-3 py-1 rounded-lg text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-          AI Assistant Kuliner 🍽️
-        </span>
       </button>
     )
   }
@@ -288,7 +292,15 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       {/* Header */}
       <div className="bg-black text-white p-4 rounded-t-2xl flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Bot className="h-5 w-5" />
+          <div className="relative h-7 w-7">
+            <Image
+              src="/ang.png"
+              alt="AI Assistant"
+              fill
+              sizes="28px"
+              className="object-contain"
+            />
+          </div>
           <div className="flex flex-col">
             <span className="font-semibold text-sm">AI Assistant Kuliner</span>
             <span className="text-xs text-gray-300">
@@ -315,8 +327,14 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
             }`}
           >
             {message.role === 'assistant' && (
-              <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center shrink-0">
-                <Bot className="h-4 w-4 text-white" />
+              <div className="relative w-10 h-10 shrink-0">
+                <Image
+                  src="/ang.png"
+                  alt="AI"
+                  fill
+                  sizes="40px"
+                  className="object-contain"
+                />
               </div>
             )}
 
@@ -345,8 +363,14 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
 
         {isLoading && (
           <div className="flex gap-3 justify-start">
-            <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center">
-              <Bot className="h-4 w-4 text-white" />
+            <div className="relative w-8 h-8 shrink-0">
+              <Image
+                src="/ang.png"
+                alt="AI"
+                fill
+                sizes="32px"
+                className="object-contain"
+              />
             </div>
             <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm p-3 shadow-sm">
               <div className="flex gap-1">
