@@ -3,27 +3,24 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Star, Clock, ArrowLeft, Store, Plus } from 'lucide-react'
+import { Star, Clock, ArrowLeft, Store, UtensilsCrossed, XCircle, CheckCircle2, X } from 'lucide-react'
 import { Kantin, Menu } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
-import { useCart } from '@/contexts/CartContext'
-import SearchBar from '@/components/SearchBar'
-import MealFilter, { type MealTime } from '@/components/MealFilter'
 import AIAssistant from '@/components/AIAssistant'
+import MenuCard from '@/components/MenuCard'
 
 export default function KantinDetailPage() {
   const params = useParams()
   const router = useRouter()
   const kantinId = params['kantin-id'] as string
-  const { addItem } = useCart()
-
   const [kantin, setKantin] = useState<Kantin | null>(null)
   const [menus, setMenus] = useState<Menu[]>([])
   const [filteredMenus, setFilteredMenus] = useState<Menu[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [mealFilter, setMealFilter] = useState<MealTime>('')
+  const [tableNumber, setTableNumber] = useState<string>('')
+  const [showTableModal, setShowTableModal] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<string>('semua')
 
   useEffect(() => {
     async function fetchKantinData() {
@@ -95,25 +92,29 @@ export default function KantinDetailPage() {
 
   useEffect(() => {
     filterMenus()
-  }, [menus, searchQuery, mealFilter])
+  }, [menus, selectedCategory])
+
+  useEffect(() => {
+    if (!kantinId) return
+    const saved = typeof window !== 'undefined'
+      ? sessionStorage.getItem(`table-number-${kantinId}`)
+      : null
+    if (saved) {
+      setTableNumber(saved)
+      setShowTableModal(false)
+    } else {
+      setShowTableModal(true)
+    }
+  }, [kantinId])
 
   const filterMenus = () => {
     let filtered = menus
 
-    // Filter by search query
-    if (searchQuery) {
-      filtered = filtered.filter(menu => 
-        menu.nama_menu.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        menu.deskripsi?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    }
-
-    // Filter by meal type
-    if (mealFilter) {
-      filtered = filtered.filter(menu => 
-        menu.kategori_menu && menu.kategori_menu.includes(mealFilter)
-      )
-    }
+    filtered = filtered.filter(menu =>
+      selectedCategory === 'semua'
+        ? true
+        : menu.kategori_menu?.some(cat => cat?.toLowerCase() === selectedCategory.toLowerCase())
+    )
 
     setFilteredMenus(filtered)
   }
@@ -146,11 +147,6 @@ export default function KantinDetailPage() {
     }
 
     return stars
-  }
-
-  const handleAddToCart = (menu: Menu) => {
-    if (!kantin) return
-    addItem(menu, kantin)
   }
 
   if (loading) {
@@ -198,17 +194,19 @@ export default function KantinDetailPage() {
     return (
       <div className="min-h-screen bg-white">
         <div className="max-w-4xl mx-auto px-4 py-16">
-          <div className="text-center">
-            <div className="text-6xl mb-4">😞</div>
-            <h1 className="text-2xl font-bold text-black mb-4">
+          <div className="text-center space-y-4">
+            <div className="flex justify-center">
+              <XCircle className="h-12 w-12 text-red-500" />
+            </div>
+            <h1 className="text-2xl font-bold text-black">
               {error || 'Kantin tidak ditemukan'}
             </h1>
-            <p className="text-gray-600 mb-8">
+            <p className="text-gray-600">
               Kantin yang Anda cari tidak tersedia atau sudah tidak aktif
             </p>
             <button
               onClick={() => router.push('/')}
-              className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800"
+              className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
             >
               Kembali ke Beranda
             </button>
@@ -220,15 +218,17 @@ export default function KantinDetailPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header Section - Full Width */}
-      <div className="relative w-full h-80 bg-gray-100">
+        {/* Header Section - Full Width */}
+        <div className="relative w-full h-72 bg-gray-100">
         {kantin.foto_profil ? (
           <Image
             src={kantin.foto_profil}
             alt={kantin.nama_kantin}
             fill
-            className="object-cover"
-            sizes="100vw"
+              className="object-cover"
+              sizes="100vw"
+              quality={95}
+              priority
           />
         ) : (
           <div className="flex items-center justify-center h-full">
@@ -258,12 +258,12 @@ export default function KantinDetailPage() {
 
       {/* Info Kantin Section */}
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-black mb-4">{kantin.nama_kantin}</h1>
+        <div className="mb-6 space-y-3">
+          <h1 className="text-3xl font-bold text-black">{kantin.nama_kantin}</h1>
           
           {/* Rating */}
           {(kantin as any).avg_rating ? (
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3">
               <div className="flex items-center">
                 {renderStars((kantin as any).avg_rating)}
               </div>
@@ -272,14 +272,14 @@ export default function KantinDetailPage() {
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3">
               <span className="text-sm text-gray-500">Belum memiliki rating</span>
             </div>
           )}
 
           {/* Operating Hours */}
           {kantin.jam_buka && kantin.jam_tutup && (
-            <div className="flex items-center gap-2 text-gray-600">
+            <div className="flex items-center gap-2 text-gray-700">
               <Clock className="h-5 w-5" />
               <span className="text-lg">
                 {kantin.jam_buka} - {kantin.jam_tutup}
@@ -288,73 +288,40 @@ export default function KantinDetailPage() {
           )}
         </div>
 
-        {/* Filter & Search Section */}
-        <div className="mb-8 space-y-4">
-          {/* Search Bar with Cart */}
-          <SearchBar value={searchQuery} onChange={setSearchQuery} showCart={true} />
-          
-          {/* Meal Filter */}
-          <MealFilter selected={mealFilter} onSelect={setMealFilter} />
+        {/* Table Number Banner */}
+        <div className="mb-6 bg-amber-50 border border-amber-100 text-amber-900 rounded-2xl px-4 py-3 text-center font-semibold shadow-sm">
+          {tableNumber ? `Nomor Meja: ${tableNumber}` : 'Masukkan nomor meja untuk mulai pesan'}
         </div>
 
+        {/* Category Nav */}
+        <CategoryNav
+          menus={menus}
+          selectedCategory={selectedCategory}
+          onSelect={setSelectedCategory}
+          onOpenModal={() => setShowTableModal(true)}
+        />
+
         {/* Menu List Section */}
-        <div>
-          <h2 className="text-2xl font-bold text-black mb-6">Menu</h2>
-          
+        <div className="mt-6">
           {filteredMenus.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="text-6xl mb-4">🍽️</div>
-              <p className="text-gray-600 text-lg">
-                {searchQuery || mealFilter 
-                  ? 'Tidak ada menu yang cocok dengan filter'
-                  : 'Belum ada menu tersedia'
-                }
+            <div className="text-center py-16 space-y-3">
+              <div className="flex justify-center">
+                <UtensilsCrossed className="h-12 w-12 text-gray-400" />
+              </div>
+              <p className="text-gray-700 text-lg font-medium">
+            {selectedCategory !== 'semua'
+              ? 'Tidak ada menu di kategori ini'
+              : 'Belum ada menu tersedia'}
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 sm:gap-6">
               {filteredMenus.map((menu) => (
-                <div key={menu.id} className="flex gap-4 p-4 border-2 border-gray-200 rounded-xl hover:border-black transition-colors">
-                  {/* Menu Image */}
-                  <div className="relative w-24 h-24 shrink-0">
-                    {menu.foto_menu ? (
-                      <Image
-                        src={menu.foto_menu}
-                        alt={menu.nama_menu}
-                        fill
-                        className="object-cover rounded-lg"
-                        sizes="96px"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
-                        <span className="text-gray-400 text-2xl">🍽️</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Menu Info */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-black mb-1">{menu.nama_menu}</h3>
-                    <p className="text-gray-600 text-sm mb-2 line-clamp-2">
-                      {menu.deskripsi || 'Tidak ada deskripsi'}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-lg font-bold text-black">{formatPrice(menu.harga)}</p>
-                        <p className="text-xs text-gray-500">
-                          Dibeli: {menu.total_sold || 0} kali
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleAddToCart(menu)}
-                        className="p-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-                        disabled={!kantin.buka_tutup}
-                      >
-                        <Plus className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <MenuCard
+                  key={menu.id}
+                  menu={menu}
+                  kantin={kantin}
+                />
               ))}
             </div>
           )}
@@ -363,6 +330,87 @@ export default function KantinDetailPage() {
 
       {/* AI Assistant */}
       <AIAssistant kantinId={kantinId} kantin={kantin} />
+
+      {/* Table Number Bottom Sheet */}
+      {showTableModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center px-4">
+          <div className="w-full max-w-md bg-white rounded-t-3xl md:rounded-3xl shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-black">Nomor Meja</h3>
+              <button
+                onClick={() => setShowTableModal(false)}
+                className="p-2 rounded-full hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600">
+              Masukkan nomor meja Anda untuk mempermudah pesanan.
+            </p>
+            <input
+              type="number"
+              min="1"
+              value={tableNumber}
+              onChange={(e) => setTableNumber(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-black"
+              placeholder="Contoh: 28"
+            />
+            <button
+              onClick={() => {
+                if (!tableNumber) return
+                sessionStorage.setItem(`table-number-${kantinId}`, tableNumber)
+                setShowTableModal(false)
+              }}
+              disabled={!tableNumber}
+            className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-150 ${
+                tableNumber
+                  ? 'bg-black text-white hover:bg-gray-900 active:scale-95'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              <CheckCircle2 className="h-5 w-5" />
+              Simpan Nomor Meja
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CategoryNav({
+  menus,
+  selectedCategory,
+  onSelect,
+}: {
+  menus: Menu[]
+  selectedCategory: string
+  onSelect: (cat: string) => void
+  onOpenModal?: () => void
+}) {
+  const items = ['semua', 'makanan', 'minuman']
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="inline-flex items-center gap-3 border-b border-gray-200 pb-3 min-w-full">
+        {items.map(cat => {
+          const isActive = selectedCategory === cat
+          const label = cat === 'semua' ? 'Semua' : cat.charAt(0).toUpperCase() + cat.slice(1)
+          return (
+            <button
+              key={cat}
+              onClick={() => onSelect(cat)}
+              className={`px-3 pb-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
+                isActive
+                  ? 'border-black text-black'
+                  : 'border-transparent text-gray-600 hover:text-black'
+              }`}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

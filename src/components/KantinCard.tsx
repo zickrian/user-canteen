@@ -34,16 +34,16 @@ export default function KantinCard({ kantin }: KantinCardProps) {
   return (
     <Link 
       href={`/kantin/${kantin.id}`}
-      className="block bg-white rounded-2xl overflow-hidden transition-all duration-300 group shadow-md hover:shadow-xl hover:shadow-black/10"
+      className="block bg-white rounded-3xl overflow-hidden transition-all duration-300 group shadow-md hover:shadow-xl hover:shadow-black/10 border border-gray-200"
     >
-      <div className="relative w-full h-32 bg-gray-100">
+      <div className="relative w-full h-40 bg-gray-100">
         {kantin.foto_profil ? (
           <Image
             src={kantin.foto_profil}
             alt={kantin.nama_kantin}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-300"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
         ) : (
           <div className="flex items-center justify-center h-full">
@@ -63,16 +63,16 @@ export default function KantinCard({ kantin }: KantinCardProps) {
         </div>
       </div>
       
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <h3 className="text-lg font-bold text-black line-clamp-1 group-hover:text-gray-700 transition-colors">
+      <div className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-lg font-semibold text-black line-clamp-1 group-hover:text-gray-700 transition-colors">
             {kantin.nama_kantin}
           </h3>
         </div>
 
         {/* Rating */}
         {(kantin.avg_rating && kantin.total_ratings && kantin.total_ratings > 0) ? (
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2">
             <div className="flex items-center">
               {renderStars(kantin.avg_rating)}
             </div>
@@ -81,7 +81,7 @@ export default function KantinCard({ kantin }: KantinCardProps) {
             </span>
           </div>
         ) : (
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500">Belum memiliki rating</span>
           </div>
         )}

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Menu, Kantin } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import MenuCard from './MenuCard'
+import { UtensilsCrossed, XCircle } from 'lucide-react'
 
 interface MenuGridProps {
   searchQuery: string
@@ -113,10 +114,13 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
   if (error) {
     return (
       <div className="text-center py-16">
-        <div className="text-red-500 text-lg mb-4">❌ {error}</div>
+        <div className="flex justify-center mb-3">
+          <XCircle className="h-10 w-10 text-red-500" />
+        </div>
+        <div className="text-red-600 text-lg mb-4 font-semibold">{error}</div>
         <button 
           onClick={() => window.location.reload()}
-          className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800"
+          className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors"
         >
           Coba Lagi
         </button>
@@ -127,7 +131,10 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
   if (filteredMenus.length === 0) {
     return (
       <div className="text-center py-16">
-        <div className="text-gray-400 text-lg mb-4">
+        <div className="flex justify-center mb-3">
+          <UtensilsCrossed className="h-10 w-10 text-gray-400" />
+        </div>
+        <div className="text-gray-600 text-lg mb-2 font-medium">
           {searchQuery || selectedCategory 
             ? 'Tidak ada menu yang cocok dengan filter Anda' 
             : 'Belum ada menu tersedia'}

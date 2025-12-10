@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { Plus, Star } from 'lucide-react'
+import { Plus, Minus, Trash2, ImageOff } from 'lucide-react'
 import { Menu, Kantin } from '@/lib/supabase'
 import { useCart } from '@/contexts/CartContext'
 
@@ -11,10 +11,25 @@ interface MenuCardProps {
 }
 
 export default function MenuCard({ menu, kantin }: MenuCardProps) {
-  const { addItem } = useCart()
+  const { addItem, updateQuantity, removeItem, cart } = useCart()
 
-  const handleAddToCart = () => {
+  const currentQuantity =
+    cart.items.find((item) => item.menu.id === menu.id)?.quantity ?? 0
+
+  const handleIncrement = () => {
     addItem(menu, kantin)
+  }
+
+  const handleDecrement = () => {
+    if (currentQuantity > 1) {
+      updateQuantity(menu.id, currentQuantity - 1)
+    } else if (currentQuantity === 1) {
+      removeItem(menu.id)
+    }
+  }
+
+  const handleDelete = () => {
+    removeItem(menu.id)
   }
 
   const formatPrice = (price: number) => {
@@ -27,88 +42,136 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
   }
 
   return (
-    <div className="bg-white border-2 border-black rounded-2xl overflow-hidden hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-300">
-      {/* Menu Image */}
-      <div className="relative w-full h-32 bg-gray-100">
-        {menu.foto_menu ? (
-          <Image
-            src={menu.foto_menu}
-            alt={menu.nama_menu}
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-gray-400 text-center">
-              <div className="text-3xl mb-1">🍽️</div>
-              <p className="text-xs">No Image</p>
+    <div className="bg-white rounded-3xl overflow-hidden shadow-md border border-gray-200 hover:shadow-xl transition-all duration-300 h-full flex flex-col">
+      {/* Menu Image with inset padding and rounded container */}
+      <div className="px-3 pt-3">
+        <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100">
+          {menu.foto_menu ? (
+            <Image
+              src={menu.foto_menu}
+              alt={menu.nama_menu}
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              quality={90}
+              priority={false}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-gray-400">
+              <ImageOff className="h-10 w-10" />
             </div>
-          </div>
-        )}
-        
-        {/* Category Badge */}
-        {menu.kategori_menu && menu.kategori_menu.length > 0 && (
-          <div className="absolute top-2 left-2">
-            <span className="bg-black text-white text-xs px-2 py-0.5 rounded-full font-medium">
-              {menu.kategori_menu[0]}
-            </span>
-          </div>
-        )}
+          )}
 
-        {/* Availability Status */}
-        {!menu.tersedia && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <span className="bg-red-500 text-white px-3 py-1 rounded-lg text-sm font-bold">
-              Tidak Tersedia
-            </span>
-          </div>
-        )}
+          {/* Category Badge */}
+          {menu.kategori_menu && menu.kategori_menu.length > 0 && (
+            <div className="absolute top-3 left-3">
+              <span className="bg-black text-white text-xs px-2 py-0.5 rounded-full font-medium">
+                {menu.kategori_menu[0]}
+              </span>
+            </div>
+          )}
+
+          {/* Availability Status */}
+          {!menu.tersedia && (
+            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+              <span className="bg-red-500 text-white px-3 py-1 rounded-lg text-sm font-bold shadow">
+                Tidak Tersedia
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Menu Info */}
-      <div className="p-3">
-        <div className="mb-2">
-          <h3 className="text-base font-bold text-black line-clamp-1 mb-1">
+      <div className="p-4 space-y-3 flex-1 flex flex-col">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-lg font-semibold text-black line-clamp-1">
             {menu.nama_menu}
           </h3>
-          {menu.deskripsi && (
-            <p className="text-xs text-gray-600 line-clamp-1">
-              {menu.deskripsi}
-            </p>
-          )}
+          <span className="text-base font-bold text-black whitespace-nowrap">
+            {formatPrice(menu.harga)}
+          </span>
         </div>
 
-        {/* Price and Rating */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-lg font-bold text-black">
-            {formatPrice(menu.harga)}
+        {menu.deskripsi && (
+          <p className="text-sm text-gray-600 leading-snug line-clamp-2">
+            {menu.deskripsi}
+          </p>
+        )}
+
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-500">
+            {menu.total_sold && menu.total_sold > 0
+              ? `Terjual ${menu.total_sold}`
+              : 'Belum ada penjualan'}
           </div>
-          
-          {menu.total_sold && menu.total_sold > 0 && (
-            <div className="flex items-center gap-1 text-xs text-gray-600">
-              <span>Terjual {menu.total_sold}</span>
+        </div>
+
+        {/* Action Bar */}
+        <div className="mt-auto">
+          {currentQuantity === 0 ? (
+            <button
+              onClick={handleIncrement}
+              disabled={!menu.tersedia}
+              className={`w-full flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all duration-150
+                ${
+                  menu.tersedia
+                    ? 'bg-red-500 text-white hover:bg-red-600 active:scale-95'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }
+              `}
+            >
+              <Plus className="h-4 w-4" />
+              Tambah
+            </button>
+          ) : (
+            <div className="flex items-center gap-3 pt-1">
+              <div className="flex items-center gap-3 bg-white">
+                <button
+                  onClick={handleDecrement}
+                  disabled={!menu.tersedia || currentQuantity === 0}
+                  className={`h-10 w-10 rounded-full flex items-center justify-center text-white text-lg font-bold transition-all duration-150
+                    ${
+                      menu.tersedia && currentQuantity > 0
+                        ? 'bg-black hover:bg-gray-800 active:scale-95'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    }
+                  `}
+                  aria-label="Kurangi jumlah"
+                >
+                  <Minus className="h-5 w-5" />
+                </button>
+
+                <span className="text-base font-semibold text-black min-w-[1.5rem] text-center">
+                  {currentQuantity}
+                </span>
+
+                <button
+                  onClick={handleIncrement}
+                  disabled={!menu.tersedia}
+                  className={`h-10 w-10 rounded-full flex items-center justify-center text-white text-lg font-bold transition-all duration-150
+                    ${
+                      menu.tersedia
+                        ? 'bg-black hover:bg-gray-800 active:scale-95'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    }
+                  `}
+                  aria-label="Tambah jumlah"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </div>
+
+              <button
+                onClick={handleDelete}
+                className="ml-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-150 bg-red-500 text-white hover:bg-red-600 active:scale-95"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </button>
             </div>
           )}
         </div>
-
-        {/* Add to Cart Button */}
-        <button
-          onClick={handleAddToCart}
-          disabled={!menu.tersedia}
-          className={`
-            w-full py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200
-            flex items-center justify-center gap-2
-            ${
-              menu.tersedia
-                ? 'bg-black text-white hover:bg-gray-800 active:scale-95'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }
-          `}
-        >
-          <Plus className="h-4 w-4" />
-          <span>Tambah ke Keranjang</span>
-        </button>
       </div>
     </div>
   )

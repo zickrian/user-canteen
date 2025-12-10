@@ -1,5 +1,6 @@
 'use client'
 
+import { Store } from 'lucide-react'
 import KantinCard from './KantinCard'
 import type { Kantin } from '@/lib/supabase'
 
@@ -15,15 +16,12 @@ export default function KantinList({ kantins, loading }: KantinListProps) {
         {[...Array(6)].map((_, i) => (
           <div
             key={i}
-            className="border-2 border-gray-200 rounded-2xl overflow-hidden animate-pulse"
+            className="border border-gray-200 rounded-3xl overflow-hidden animate-pulse bg-white shadow-sm"
           >
-            <div className="w-full h-32 bg-gray-200" />
-            <div className="p-3 space-y-2">
+            <div className="w-full h-40 bg-gray-200" />
+            <div className="p-4 space-y-2">
               <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="flex gap-2">
-                <div className="h-4 bg-gray-200 rounded w-16" />
-                <div className="h-4 bg-gray-200 rounded w-16" />
-              </div>
+              <div className="h-3 bg-gray-200 rounded w-1/2" />
             </div>
           </div>
         ))}
@@ -34,7 +32,10 @@ export default function KantinList({ kantins, loading }: KantinListProps) {
   if (kantins.length === 0) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-400 text-lg">Tidak ada kantin ditemukan</p>
+        <div className="flex justify-center mb-3">
+          <Store className="h-10 w-10 text-gray-300" />
+        </div>
+        <p className="text-gray-500 text-lg font-medium">Tidak ada kantin ditemukan</p>
       </div>
     )
   }
