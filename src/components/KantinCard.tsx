@@ -36,14 +36,16 @@ export default function KantinCard({ kantin }: KantinCardProps) {
       href={`/kantin/${kantin.id}`}
       className="block bg-white rounded-3xl overflow-hidden transition-all duration-300 group shadow-md hover:shadow-xl hover:shadow-black/10 border border-gray-200"
     >
-      <div className="relative w-full h-40 bg-gray-100">
+      <div className="relative w-full aspect-[4/3] bg-gray-100">
         {kantin.foto_profil ? (
           <Image
             src={kantin.foto_profil}
             alt={kantin.nama_kantin}
             fill
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            className="object-cover"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            quality={90}
+            priority={false}
           />
         ) : (
           <div className="flex items-center justify-center h-full">
@@ -53,12 +55,12 @@ export default function KantinCard({ kantin }: KantinCardProps) {
         
         {/* Status Badge */}
         <div className="absolute top-2 right-2">
-          <span className={`px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap shadow-sm ${
+          <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-sm flex items-center gap-1 ${
             kantin.buka_tutup && kantin.status === 'aktif'
               ? 'bg-green-500 text-white shadow-green-500/25'
               : 'bg-red-500 text-white shadow-red-500/25'
           }`}>
-            {kantin.buka_tutup && kantin.status === 'aktif' ? 'BUKA' : 'TUTUP'}
+            {kantin.buka_tutup && kantin.status === 'aktif' ? 'Buka' : 'Tutup'}
           </span>
         </div>
       </div>
