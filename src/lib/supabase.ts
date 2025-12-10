@@ -19,7 +19,8 @@ const createSupabaseClient = () => {
     throw new Error(`Missing Supabase env vars: ${missing.join(', ')}`)
   }
 
-  return createClient(url, anonKey, {
+  // Type assertions - validated above
+  return createClient(url as string, anonKey as string, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,

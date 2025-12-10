@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import MidtransClient from 'midtrans-client'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 // Initialize Midtrans
 const snap = new MidtransClient.Snap({
@@ -31,7 +26,7 @@ export async function POST(request: NextRequest) {
     const midtransOrderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` // For Midtrans
 
     // Get next sequential nomor antrian for this kantin
-    const { data: nomorAntrianData, error: nomorAntrianError } = await supabase
+    const { data: nomorAntrianData, error: nomorAntrianError } = await supabaseAdmin
       .rpc('get_next_nomor_antrian', { p_kantin_id: orderData.kantinId })
 
     if (nomorAntrianError) {
@@ -75,7 +70,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Save order to database (pesanan table) dengan semua data yang diperlukan
-    const { data: order, error: orderError } = await supabase
+    const { data: order, error: orderError } = await supabaseAdmin
       .from('pesanan')
       .insert({
         id: pesananId,
@@ -109,7 +104,7 @@ export async function POST(request: NextRequest) {
       subtotal: item.menu.harga * item.quantity
     }))
 
-    const { error: detailError } = await supabase
+    const { error: detailError } = await supabaseAdmin
       .from('detail_pesanan')
       .insert(detailPesanan)
 
@@ -122,7 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Save payment record (pembayaran table)
-    const { error: paymentError } = await supabase
+    const { error: paymentError } = await supabaseAdmin
       .from('pembayaran')
       .insert({
         pesanan_id: pesananId,

@@ -21,9 +21,10 @@ const getAdminEnv = (): { supabaseUrl: string; serviceRoleKey: string } => {
     throw new Error(`Missing Supabase admin env vars: ${missing.join(', ')}`)
   }
 
+  // Type assertions - validated above
   return {
-    supabaseUrl,
-    serviceRoleKey
+    supabaseUrl: supabaseUrl as string,
+    serviceRoleKey: serviceRoleKey as string
   }
 }
 

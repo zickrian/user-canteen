@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import MidtransClient from 'midtrans-client'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 // Initialize Midtrans
 const snap = new MidtransClient.Snap({
@@ -32,7 +27,7 @@ export async function GET(
     const transaction = await (snap as any).transaction.status(orderId)
 
     // Find the pesanan by midtrans order ID first
-    const { data: paymentData, error: paymentFetchError } = await supabase
+    const { data: paymentData, error: paymentFetchError } = await supabaseAdmin
       .from('pembayaran')
       .select('pesanan_id, status')
       .eq('midtrans_order_id', orderId)
@@ -58,7 +53,7 @@ export async function GET(
     }
 
     // Update payment record
-    const { error: paymentUpdateError } = await supabase
+    const { error: paymentUpdateError } = await supabaseAdmin
       .from('pembayaran')
       .update({
         status: paymentStatus,
