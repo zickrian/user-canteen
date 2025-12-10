@@ -65,11 +65,18 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
     fetchMenus()
   }, [])
 
-  // Filter menus based on search query and category
+  const kantinMap = kantins.reduce<Record<string, Kantin>>((acc, k) => {
+    acc[k.id] = k
+    return acc
+  }, {})
+
+  // Filter menus based on search query and category (menu or kantin name)
   const filteredMenus = menus.filter(menu => {
+    const q = searchQuery.toLowerCase()
     const matchesSearch = searchQuery === '' || 
-      menu.nama_menu.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      menu.deskripsi?.toLowerCase().includes(searchQuery.toLowerCase())
+      menu.nama_menu.toLowerCase().includes(q) ||
+      menu.deskripsi?.toLowerCase().includes(q) ||
+      kantinMap[menu.kantin_id]?.nama_kantin?.toLowerCase().includes(q)
 
     const matchesCategory = selectedCategory === '' || 
       menu.kategori_menu?.some(cat => cat.toLowerCase().includes(selectedCategory.toLowerCase()))

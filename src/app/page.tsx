@@ -23,7 +23,7 @@ export default function Home() {
 
   useEffect(() => {
     filterKantins()
-  }, [kantins, searchQuery, mealFilter])
+  }, [kantins, searchQuery, mealFilter, menus])
 
   const fetchData = async () => {
     try {
@@ -34,7 +34,7 @@ export default function Home() {
         .from('kantin')
         .select(`
           *,
-          menu(id, kategori_menu)
+          menu(id, kategori_menu, nama_menu)
         `)
         .eq('status', 'aktif')
         .order('nama_kantin', { ascending: true })
@@ -74,11 +74,17 @@ export default function Home() {
   const filterKantins = () => {
     let filtered = kantins
 
-    // Filter by search query
+    // Filter by search query (kantin name or menu name)
     if (searchQuery) {
-      filtered = filtered.filter(kantin => 
-        kantin.nama_kantin.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      const q = searchQuery.toLowerCase()
+      filtered = filtered.filter(kantin => {
+        const matchKantin = kantin.nama_kantin.toLowerCase().includes(q)
+        const matchMenu = menus.some(menu =>
+          menu.kantin_id === kantin.id &&
+          menu.nama_menu?.toLowerCase().includes(q)
+        )
+        return matchKantin || matchMenu
+      })
     }
 
     // Filter by meal type
@@ -107,7 +113,7 @@ export default function Home() {
           <MealFilter selected={mealFilter} onSelect={setMealFilter} />
         </div>
 
-        {mealFilter ? (
+        {mealFilter || searchQuery ? (
           <MenuGrid searchQuery={searchQuery} selectedCategory={mealFilter} />
         ) : (
           <KantinList kantins={filteredKantins} loading={loading} />

@@ -42,7 +42,7 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
   }
 
   return (
-    <div className="bg-white rounded-3xl overflow-hidden shadow-md border border-gray-200 hover:shadow-xl transition-all duration-300 h-full flex flex-col">
+    <div className="bg-white rounded-3xl overflow-hidden shadow-md shadow-black/5 border border-gray-200 hover:shadow-lg hover:shadow-red-100/50 hover:ring-1 hover:ring-red-100 transition-all duration-300 h-full flex flex-col">
       {/* Menu Image with inset padding and rounded container */}
       <div className="px-3 pt-3">
         <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100">

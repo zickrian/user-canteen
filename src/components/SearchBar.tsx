@@ -1,6 +1,6 @@
 'use client'
 
-import { Search, ShoppingCart } from 'lucide-react'
+import { Search, ShoppingCart, X } from 'lucide-react'
 import { useCart } from '@/contexts/CartContext'
 import Link from 'next/link'
 
@@ -25,8 +25,18 @@ export default function SearchBar({ value, onChange, showCart = false }: SearchB
             placeholder="Cari menu atau kantin..."
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full py-3 pl-12 pr-4 text-base border border-gray-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all"
+            className="w-full py-3 pl-12 pr-12 text-base border border-gray-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all"
           />
+          {value && (
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-300"
+              aria-label="Hapus pencarian"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         {/* Shopping Cart Icon - only show if showCart is true */}

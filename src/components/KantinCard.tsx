@@ -34,7 +34,7 @@ export default function KantinCard({ kantin }: KantinCardProps) {
   return (
     <Link 
       href={`/kantin/${kantin.id}`}
-      className="block bg-white rounded-3xl overflow-hidden transition-all duration-300 group shadow-md hover:shadow-xl hover:shadow-black/10 border border-gray-200"
+      className="block bg-white rounded-3xl overflow-hidden transition-all duration-300 group shadow-md shadow-black/5 hover:shadow-lg hover:shadow-red-100/50 hover:ring-1 hover:ring-red-100 border border-gray-200"
     >
       <div className="relative w-full aspect-[4/3] bg-gray-100">
         {kantin.foto_profil ? (
