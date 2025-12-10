@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
         pathname: '/storage/v1/object/public/**',
       },
     ],
+    // Allow the custom qualities used in image components
+    qualities: [75, 90, 95],
   },
   // Fix for dev tunnel server actions
   serverExternalPackages: ['@supabase/supabase-js'],

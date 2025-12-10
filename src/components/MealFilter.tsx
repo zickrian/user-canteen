@@ -43,8 +43,8 @@ export default function MealFilter({ selected, onSelect }: MealFilterProps) {
             min-w-max p-4 rounded-lg transition-all shrink-0
             ${
               selected === filter.value
-                ? 'bg-black text-white shadow-lg'
-                : 'bg-white text-black border border-gray-300 shadow-sm hover:shadow-md'
+                ? 'bg-red-600 text-white shadow-lg shadow-red-200'
+                : 'bg-white text-black border border-gray-300 shadow-sm hover:shadow-md hover:border-red-300'
             }
           `}
         >

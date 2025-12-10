@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
 import { Menu, Kantin } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import MenuCard from './MenuCard'
-import { UtensilsCrossed, XCircle } from 'lucide-react'
+import { UtensilsCrossed, XCircle, Store } from 'lucide-react'
 
 interface MenuGridProps {
   searchQuery: string
@@ -153,14 +155,27 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
         if (!kantin) return null
 
         return (
-          <div key={kantinId} className="space-y-4">
+          <div
+            key={kantinId}
+            className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:-translate-y-0.5"
+          >
             {/* Kantin Header */}
             <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">
-                    {kantin.nama_kantin.charAt(0).toUpperCase()}
-                  </span>
+                <div className="relative w-14 h-14 rounded-full overflow-hidden bg-gray-100 border border-gray-200">
+                  {kantin.foto_profil ? (
+                    <Image
+                      src={kantin.foto_profil}
+                      alt={kantin.nama_kantin}
+                      fill
+                      className="object-cover"
+                      sizes="56px"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <Store className="h-6 w-6" />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-black">{kantin.nama_kantin}</h3>
@@ -172,10 +187,16 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
                   </p>
                 </div>
               </div>
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-3">
                 <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
                   {menus.length} menu
                 </span>
+                <Link
+                  href={`/kantin/${kantin.id}`}
+                  className="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+                >
+                  Kunjungi Kios
+                </Link>
               </div>
             </div>
 

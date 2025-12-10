@@ -5,6 +5,7 @@ import KantinList from '@/components/KantinList'
 import SearchBar from '@/components/SearchBar'
 import MealFilter, { type MealTime } from '@/components/MealFilter'
 import AIAssistant from '@/components/AIAssistant'
+import MenuGrid from '@/components/MenuGrid'
 import { supabase } from '@/lib/supabase'
 import type { KantinWithRating, Menu } from '@/lib/supabase'
 
@@ -105,8 +106,12 @@ export default function Home() {
         <div className="mb-8">
           <MealFilter selected={mealFilter} onSelect={setMealFilter} />
         </div>
-        
-        <KantinList kantins={filteredKantins} loading={loading} />
+
+        {mealFilter ? (
+          <MenuGrid searchQuery={searchQuery} selectedCategory={mealFilter} />
+        ) : (
+          <KantinList kantins={filteredKantins} loading={loading} />
+        )}
       </div>
 
       {/* AI Assistant - Fixed Position Bottom Right */}

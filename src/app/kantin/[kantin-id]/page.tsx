@@ -60,20 +60,22 @@ export default function KantinDetailPage() {
         setMenus(menusData || [])
         setFilteredMenus(menusData || [])
 
-        // Note: Rating function might not exist, handle gracefully
-        try {
-          const { data: ratingData } = await supabase
-            .rpc('get_kantin_rating', { p_kantin_id: kantinId })
+        // Optional: rating RPC can be disabled to avoid 404 in environments without the function
+        if (process.env.NEXT_PUBLIC_ENABLE_RATING === 'true') {
+          try {
+            const { data: ratingData } = await supabase
+              .rpc('get_kantin_rating', { p_kantin_id: kantinId })
 
-          if (ratingData && ratingData.length > 0) {
-            setKantin(prev => prev ? {
-              ...prev,
-              avg_rating: ratingData[0].avg_rating,
-              total_ratings: ratingData[0].total_ratings
-            } : null)
+            if (ratingData && ratingData.length > 0) {
+              setKantin(prev => prev ? {
+                ...prev,
+                avg_rating: ratingData[0].avg_rating,
+                total_ratings: ratingData[0].total_ratings
+              } : null)
+            }
+          } catch (ratingError) {
+            console.log('Rating function not available:', ratingError)
           }
-        } catch (ratingError) {
-          console.log('Rating function not available:', ratingError)
         }
 
       } catch (error) {
@@ -401,8 +403,8 @@ function CategoryNav({
               onClick={() => onSelect(cat)}
               className={`px-3 pb-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
                 isActive
-                  ? 'border-black text-black'
-                  : 'border-transparent text-gray-600 hover:text-black'
+                  ? 'border-red-600 text-red-600'
+                  : 'border-transparent text-gray-600 hover:text-red-600'
               }`}
             >
               {label}
