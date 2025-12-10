@@ -75,7 +75,7 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
           {!menu.tersedia && (
             <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
               <span className="bg-red-500 text-white px-3 py-1 rounded-lg text-sm font-bold shadow">
-              Sudah Habis
+                Sudah Habis
               </span>
             </div>
           )}
@@ -84,27 +84,23 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
 
       {/* Menu Info */}
       <div className="p-4 space-y-3 flex-1 flex flex-col">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-base sm:text-lg font-semibold text-black leading-tight line-clamp-1">
+        <div className="flex items-start justify-between gap-2 min-h-[48px]">
+          <h3 className="text-base sm:text-lg font-semibold text-black leading-tight line-clamp-2">
             {menu.nama_menu}
           </h3>
-          <span className="text-sm sm:text-base font-bold text-black whitespace-nowrap">
+          <span className="text-sm sm:text-base font-bold text-gray-900 whitespace-nowrap">
             {formatPrice(menu.harga)}
           </span>
         </div>
 
-        {menu.deskripsi && (
-          <p className="text-xs sm:text-sm text-gray-600 leading-snug line-clamp-2">
-            {menu.deskripsi}
-          </p>
-        )}
+        <p className="text-xs sm:text-sm text-gray-600 leading-snug line-clamp-2 min-h-[36px]">
+          {menu.deskripsi || '\u00a0'}
+        </p>
 
-        <div className="flex items-center justify-between">
-          <div className="text-[11px] sm:text-xs text-gray-500">
-            {menu.total_sold && menu.total_sold > 0
-              ? `Terjual ${menu.total_sold}`
-              : 'Belum ada penjualan'}
-          </div>
+        <div className="text-[11px] sm:text-xs text-gray-500">
+          {menu.total_sold && menu.total_sold > 0
+            ? `Terjual ${menu.total_sold}`
+            : 'Belum ada penjualan'}
         </div>
 
         {/* Action Bar */}
@@ -113,7 +109,7 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
             <button
               onClick={handleIncrement}
               disabled={!menu.tersedia}
-              className={`w-full flex items-center justify-center gap-2 py-3 rounded-full text-xs sm:text-sm font-semibold transition-all duration-150
+              className={`w-full flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all duration-150
                 ${
                   menu.tersedia
                     ? 'bg-red-500 text-white hover:bg-red-600 active:scale-95'
@@ -142,7 +138,7 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
                   <Minus className="h-5 w-5" />
                 </button>
 
-                <span className="text-sm sm:text-base font-semibold text-black min-w-[1.5rem] text-center">
+                <span className="text-sm sm:text-base font-semibold text-black min-w-[1.75rem] text-center">
                   {currentQuantity}
                 </span>
 
@@ -164,7 +160,7 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
 
               <button
                 onClick={handleDelete}
-                className="ml-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-150 bg-red-500 text-white hover:bg-red-600 active:scale-95"
+                className="ml-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-150 bg-red-500 text-white hover:bg-red-600 active:scale-95"
               >
                 <Trash2 className="h-4 w-4" />
                 Delete

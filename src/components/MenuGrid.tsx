@@ -100,7 +100,7 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
     return (
       <div className="space-y-8">
         {/* Loading skeleton */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="animate-pulse">
               <div className="border-2 border-gray-200 rounded-2xl overflow-hidden">
@@ -208,7 +208,7 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
             </div>
 
             {/* Menu Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {menus.map((menu) => (
                 <MenuCard 
                   key={menu.id} 
