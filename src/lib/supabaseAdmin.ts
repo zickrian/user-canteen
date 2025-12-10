@@ -6,7 +6,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const getAdminEnv = () => {
+const getAdminEnv = (): { supabaseUrl: string; serviceRoleKey: string } => {
   const supabaseUrl =
     process.env.SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -21,7 +21,10 @@ const getAdminEnv = () => {
     throw new Error(`Missing Supabase admin env vars: ${missing.join(', ')}`)
   }
 
-  return { supabaseUrl, serviceRoleKey }
+  return {
+    supabaseUrl,
+    serviceRoleKey
+  }
 }
 
 let cachedAdmin: SupabaseClient | null = null
