@@ -70,6 +70,8 @@ export type DetailPesanan = {
   harga_satuan: number
   subtotal: number
   created_at: string
+  // Optional relation when detail_pesanan is fetched with `menu (*)`
+  menu?: Menu | null
 }
 
 export type Pembayaran = {
