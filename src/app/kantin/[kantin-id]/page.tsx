@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Star, Clock, ArrowLeft, Store, UtensilsCrossed, XCircle, CheckCircle2, X } from 'lucide-react'
+import { Star, Clock, ArrowLeft, Store, UtensilsCrossed, XCircle, CheckCircle2, X, Pencil } from 'lucide-react'
 import { Kantin, Menu } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import AIAssistant from '@/components/AIAssistant'
@@ -97,11 +97,24 @@ export default function KantinDetailPage() {
 
   useEffect(() => {
     if (!kantinId) return
-    const saved = typeof window !== 'undefined'
-      ? sessionStorage.getItem(`table-number-${kantinId}`)
+
+    const globalKey = 'table-number'
+    const kantinKey = `table-number-${kantinId}`
+
+    const savedGlobal = typeof window !== 'undefined'
+      ? sessionStorage.getItem(globalKey)
       : null
-    if (saved) {
-      setTableNumber(saved)
+    const savedKantin = typeof window !== 'undefined'
+      ? sessionStorage.getItem(kantinKey)
+      : null
+
+    const initialTable = savedGlobal || savedKantin
+
+    if (initialTable) {
+      setTableNumber(initialTable)
+      // keep both keys populated so nomor meja terbagi ke semua kios
+      sessionStorage.setItem(globalKey, initialTable)
+      sessionStorage.setItem(kantinKey, initialTable)
       setShowTableModal(false)
     } else {
       setShowTableModal(true)
@@ -290,8 +303,17 @@ export default function KantinDetailPage() {
         </div>
 
         {/* Table Number Banner */}
-        <div className="mb-6 bg-amber-50 border border-amber-100 text-amber-900 rounded-2xl px-4 py-3 text-center font-semibold shadow-sm">
-          {tableNumber ? `Nomor Meja: ${tableNumber}` : 'Masukkan nomor meja untuk mulai pesan'}
+        <div className="mb-6 bg-amber-50 border border-amber-100 text-amber-900 rounded-2xl px-4 py-3 font-semibold shadow-sm flex items-center justify-between gap-3">
+          <span className="flex-1 text-center">
+            {tableNumber ? `Nomor Meja: ${tableNumber}` : 'Masukkan nomor meja untuk mulai pesan'}
+          </span>
+          <button
+            onClick={() => setShowTableModal(true)}
+            className="p-2 rounded-full hover:bg-amber-100 text-amber-900 transition"
+            aria-label="Edit nomor meja"
+          >
+            <Pencil className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Category Nav */}
@@ -359,6 +381,7 @@ export default function KantinDetailPage() {
             <button
               onClick={() => {
                 if (!tableNumber) return
+                sessionStorage.setItem('table-number', tableNumber)
                 sessionStorage.setItem(`table-number-${kantinId}`, tableNumber)
                 setShowTableModal(false)
               }}

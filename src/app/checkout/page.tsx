@@ -22,6 +22,7 @@ export default function CheckoutPage() {
     nomor_meja: '',
     tipe_pesanan: 'dine_in'
   })
+  const [isTableNumberLocked, setIsTableNumberLocked] = useState(false)
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -80,6 +81,28 @@ export default function CheckoutPage() {
       if (interval) clearInterval(interval)
     }
   }, [showQR, paymentStatus, midtransOrderId])
+
+  useEffect(() => {
+    const globalKey = 'table-number'
+    const kantinKey = cart.items[0]?.kantin?.id ? `table-number-${cart.items[0].kantin.id}` : null
+
+    const savedGlobal = typeof window !== 'undefined'
+      ? sessionStorage.getItem(globalKey)
+      : null
+    const savedKantin = typeof window !== 'undefined' && kantinKey
+      ? sessionStorage.getItem(kantinKey)
+      : null
+
+    const nomorMeja = savedGlobal || savedKantin
+
+    if (nomorMeja) {
+      setFormData(prev => ({
+        ...prev,
+        nomor_meja: nomorMeja
+      }))
+      setIsTableNumberLocked(true)
+    }
+  }, [cart.items])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -406,9 +429,15 @@ export default function CheckoutPage() {
                   value={formData.nomor_meja}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+                  readOnly={isTableNumberLocked}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black ${isTableNumberLocked ? 'bg-gray-50 border-gray-200 cursor-not-allowed' : 'border-gray-300'}`}
                   placeholder="Contoh: A1, B2, etc. (untuk pengiriman pesanan)"
                 />
+                {isTableNumberLocked && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Nomor meja mengikuti pilihan Anda sebelumnya. Ubah dari kartu nomor meja di kios.
+                  </p>
+                )}
               </div>
               
               <div>
