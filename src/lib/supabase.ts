@@ -1,17 +1,50 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'ekantin-ai',
+let cachedClient: SupabaseClient | null = null
+
+const createSupabaseClient = () => {
+  const url = supabaseUrl
+  const anonKey = supabaseAnonKey
+  const missing: string[] = []
+  if (!url) missing.push('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL')
+  if (!anonKey)
+    missing.push('SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY')
+
+  if (!url || !anonKey) {
+    throw new Error(`Missing Supabase env vars: ${missing.join(', ')}`)
+  }
+
+  return createClient(url, anonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
     },
+    global: {
+      headers: {
+        'X-Client-Info': 'ekantin-ai',
+      },
+    },
+  })
+}
+
+export const getSupabaseClient = (): SupabaseClient => {
+  if (!cachedClient) {
+    cachedClient = createSupabaseClient()
+  }
+  return cachedClient
+}
+
+// Proxy to delay client creation until first usage, avoiding build-time env errors
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const client = getSupabaseClient()
+    // @ts-ignore - dynamic property access
+    return client[prop]
   },
 })
 
