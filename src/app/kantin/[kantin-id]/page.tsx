@@ -3,16 +3,20 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Star, Clock, ArrowLeft, Store, UtensilsCrossed, XCircle, CheckCircle2, X, Pencil } from 'lucide-react'
+import { Star, Clock, ArrowLeft, Store, UtensilsCrossed, XCircle, CheckCircle2, X, Pencil, ShoppingCart } from 'lucide-react'
 import { Kantin, Menu } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import AIAssistant from '@/components/AIAssistant'
 import MenuCard from '@/components/MenuCard'
+import { useCart } from '@/contexts/CartContext'
+import Link from 'next/link'
 
 export default function KantinDetailPage() {
   const params = useParams()
   const router = useRouter()
   const kantinId = params['kantin-id'] as string
+  const { getItemCount } = useCart()
+  const itemCount = getItemCount()
   const [kantin, setKantin] = useState<Kantin | null>(null)
   const [menus, setMenus] = useState<Menu[]>([])
   const [filteredMenus, setFilteredMenus] = useState<Menu[]>([])
@@ -302,18 +306,32 @@ export default function KantinDetailPage() {
           )}
         </div>
 
-        {/* Table Number Banner */}
-        <div className="mb-6 bg-amber-50 border border-amber-100 text-amber-900 rounded-2xl px-4 py-3 font-semibold shadow-sm flex items-center justify-between gap-3">
-          <span className="flex-1 text-center">
-            {tableNumber ? `Nomor Meja: ${tableNumber}` : 'Masukkan nomor meja untuk mulai pesan'}
-          </span>
-          <button
-            onClick={() => setShowTableModal(true)}
-            className="p-2 rounded-full hover:bg-amber-100 text-amber-900 transition"
-            aria-label="Edit nomor meja"
+        {/* Table Number Banner with Cart */}
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex-1 bg-amber-50 border border-amber-100 text-amber-900 rounded-2xl px-4 py-3 font-semibold shadow-sm flex items-center justify-between gap-3">
+            <span className="flex-1 text-center">
+              {tableNumber ? `Nomor Meja: ${tableNumber}` : 'Masukkan nomor meja untuk mulai pesan'}
+            </span>
+            <button
+              onClick={() => setShowTableModal(true)}
+              className="p-2 rounded-full hover:bg-amber-100 text-amber-900 transition"
+              aria-label="Edit nomor meja"
+            >
+              <Pencil className="h-5 w-5" />
+            </button>
+          </div>
+          <Link
+            href="/checkout"
+            className="relative p-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+            aria-label="Keranjang belanja"
           >
-            <Pencil className="h-5 w-5" />
-          </button>
+            <ShoppingCart className="h-6 w-6" />
+            {itemCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                {itemCount > 99 ? '99+' : itemCount}
+              </span>
+            )}
+          </Link>
         </div>
 
         {/* Category Nav */}
@@ -338,7 +356,7 @@ export default function KantinDetailPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div className="space-y-3">
               {filteredMenus.map((menu) => (
                 <MenuCard
                   key={menu.id}

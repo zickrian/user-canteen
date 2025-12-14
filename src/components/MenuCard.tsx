@@ -42,74 +42,72 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
   }
 
   return (
-    <div className="bg-white rounded-3xl overflow-hidden shadow-md shadow-black/5 border border-gray-200 hover:shadow-lg hover:shadow-red-100/50 hover:ring-1 hover:ring-red-100 transition-all duration-300 h-full flex flex-col">
-      {/* Menu Image with inset padding and rounded container */}
-      <div className="px-3 pt-3">
-        <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100">
-          {menu.foto_menu ? (
-            <Image
-              src={menu.foto_menu}
-              alt={menu.nama_menu}
-              fill
-              className="object-cover"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              quality={90}
-              priority={false}
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              <ImageOff className="h-10 w-10" />
-            </div>
-          )}
+    <div className="bg-white rounded-2xl overflow-hidden shadow-md shadow-black/5 border border-gray-200 hover:shadow-lg hover:shadow-red-100/50 hover:ring-1 hover:ring-red-100 transition-all duration-300 flex items-center gap-4 p-3">
+      {/* Menu Image - Left Side */}
+      <div className="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-xl overflow-hidden bg-gray-100">
+        {menu.foto_menu ? (
+          <Image
+            src={menu.foto_menu}
+            alt={menu.nama_menu}
+            fill
+            className="object-cover"
+            sizes="112px"
+            quality={90}
+            priority={false}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full text-gray-400">
+            <ImageOff className="h-8 w-8" />
+          </div>
+        )}
 
-          {/* Category Badge */}
-          {menu.kategori_menu && menu.kategori_menu.length > 0 && (
-            <div className="absolute top-3 left-3">
-              <span className="bg-black text-white text-[11px] sm:text-xs px-2 py-0.5 rounded-full font-medium">
-                {menu.kategori_menu[0]}
-              </span>
-            </div>
-          )}
+        {/* Category Badge */}
+        {menu.kategori_menu && menu.kategori_menu.length > 0 && (
+          <div className="absolute top-1.5 left-1.5">
+            <span className="bg-black text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+              {menu.kategori_menu[0]}
+            </span>
+          </div>
+        )}
 
-          {/* Availability Status */}
-          {!menu.tersedia && (
-            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-              <span className="bg-red-500 text-white px-3 py-1 rounded-lg text-sm font-bold shadow">
-                Sudah Habis
-              </span>
-            </div>
-          )}
-        </div>
+        {/* Availability Status */}
+        {!menu.tersedia && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <span className="bg-red-500 text-white px-2 py-0.5 rounded text-xs font-bold shadow">
+              Habis
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Menu Info */}
-      <div className="p-4 space-y-3 flex-1 flex flex-col">
-        <div className="flex items-start justify-between gap-2 min-h-[48px]">
-          <h3 className="text-base sm:text-lg font-semibold text-black leading-tight line-clamp-2">
-            {menu.nama_menu}
-          </h3>
-          <span className="text-sm sm:text-base font-bold text-gray-900 whitespace-nowrap">
-            {formatPrice(menu.harga)}
-          </span>
-        </div>
+      {/* Menu Info - Middle Section */}
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <h3 className="text-base sm:text-lg font-semibold text-black leading-tight line-clamp-1">
+          {menu.nama_menu}
+        </h3>
 
-        <p className="text-xs sm:text-sm text-gray-600 leading-snug line-clamp-2 min-h-[36px]">
-          {menu.deskripsi || '\u00a0'}
+        <p className="text-xs sm:text-sm text-gray-600 leading-snug line-clamp-2">
+          {menu.deskripsi || 'Tidak ada deskripsi'}
         </p>
 
-        <div className="text-[11px] sm:text-xs text-gray-500">
+        <div className="text-[10px] sm:text-xs text-gray-500">
           {menu.total_sold && menu.total_sold > 0
             ? `Terjual ${menu.total_sold}`
             : 'Belum ada penjualan'}
         </div>
+      </div>
 
-        {/* Action Bar */}
-        <div className="mt-auto">
-          {currentQuantity === 0 ? (
+      {/* Action Button - Right Side */}
+      <div className="shrink-0 flex flex-col items-end gap-2 min-w-[120px]">
+        {currentQuantity === 0 ? (
+          <>
+            <span className="text-sm sm:text-base font-bold text-gray-900 whitespace-nowrap">
+              {formatPrice(menu.harga)}
+            </span>
             <button
               onClick={handleIncrement}
               disabled={!menu.tersedia}
-              className={`w-full flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all duration-150
+              className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold transition-all duration-150 w-full
                 ${
                   menu.tersedia
                     ? 'bg-red-500 text-white hover:bg-red-600 active:scale-95'
@@ -118,15 +116,20 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
               `}
             >
               <Plus className="h-4 w-4" />
-              Tambah
+              <span className="hidden sm:inline">Tambah</span>
             </button>
-          ) : (
-            <div className="flex items-center gap-3 pt-1">
-              <div className="flex items-center gap-3 bg-white">
+          </>
+        ) : (
+          <>
+            <span className="text-sm sm:text-base font-bold text-gray-900 whitespace-nowrap">
+              {formatPrice(menu.harga)}
+            </span>
+            <div className="flex items-center gap-2 w-full">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={handleDecrement}
                   disabled={!menu.tersedia || currentQuantity === 0}
-                  className={`h-10 w-10 rounded-full flex items-center justify-center text-white text-lg font-bold transition-all duration-150
+                  className={`h-9 w-9 rounded-full flex items-center justify-center text-white transition-all duration-150
                     ${
                       menu.tersedia && currentQuantity > 0
                         ? 'bg-black hover:bg-gray-800 active:scale-95'
@@ -135,17 +138,17 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
                   `}
                   aria-label="Kurangi jumlah"
                 >
-                  <Minus className="h-5 w-5" />
+                  <Minus className="h-4 w-4" />
                 </button>
 
-                <span className="text-sm sm:text-base font-semibold text-black min-w-[1.75rem] text-center">
+                <span className="text-sm font-semibold text-black min-w-6 text-center">
                   {currentQuantity}
                 </span>
 
                 <button
                   onClick={handleIncrement}
                   disabled={!menu.tersedia}
-                  className={`h-10 w-10 rounded-full flex items-center justify-center text-white text-lg font-bold transition-all duration-150
+                  className={`h-9 w-9 rounded-full flex items-center justify-center text-white transition-all duration-150
                     ${
                       menu.tersedia
                         ? 'bg-black hover:bg-gray-800 active:scale-95'
@@ -154,20 +157,20 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
                   `}
                   aria-label="Tambah jumlah"
                 >
-                  <Plus className="h-5 w-5" />
+                  <Plus className="h-4 w-4" />
                 </button>
               </div>
 
               <button
                 onClick={handleDelete}
-                className="ml-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-150 bg-red-500 text-white hover:bg-red-600 active:scale-95"
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold transition-all duration-150 bg-red-500 text-white hover:bg-red-600 active:scale-95 flex-1"
               >
                 <Trash2 className="h-4 w-4" />
-                Delete
+                <span className="hidden sm:inline">Hapus</span>
               </button>
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </div>
   )
