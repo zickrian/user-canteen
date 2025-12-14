@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { GoogleGenAI, FunctionCallingConfigMode } from '@google/genai'
 import { tools } from '@/lib/geminiTools'
 import { SYSTEM_PROMPT } from '@/lib/systemPrompt'
 import {
@@ -36,6 +37,11 @@ import {
   rpcGetFallbackMenus,
   rpcGetMenusUnder10k,
   rpcGetAllMenusGlobal,
+  rpcFindMenuByName,
+  rpcSearchMenu,
+  rpcRecommendMenu,
+  rpcRecommendBundle,
+  rpcQueryMenuDirect,
 } from '@/lib/aiTools'
 
 export const dynamic = 'force-dynamic'
@@ -84,59 +90,41 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Initialize GoogleGenAI client
+    const ai = new GoogleGenAI({ apiKey })
+
     // STEP 1: Kirim pesan ke Gemini untuk merencanakan tool usage
     console.log('Step 1: Planning with Gemini...')
     console.log('Message:', message)
     console.log('KantinId:', kantinId)
     
-    const firstRequest = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { text: `${SYSTEM_PROMPT}\n\nUser: ${message}\n\nKantin ID: ${kantinId || 'global'}` }
-              ],
-            },
-          ],
-          tools: [tools],
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 800,
+    const firstRequest = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `${SYSTEM_PROMPT}\n\nUser: ${message}\n\nKantin ID: ${kantinId || 'global'}`,
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        toolConfig: {
+          functionCallingConfig: {
+            mode: FunctionCallingConfigMode.AUTO,
           },
-        }),
-      }
-    )
-
-    if (!firstRequest.ok) {
-      const errorText = await firstRequest.text()
-      console.error('Gemini API Error (Step 1):', errorText)
-      console.error('Status:', firstRequest.status)
-      return NextResponse.json(
-        { 
-          error: `Gemini API error: ${firstRequest.status}`,
-          details: errorText.substring(0, 200)
         },
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      )
-    }
+        tools: [{ functionDeclarations: tools.functionDeclarations }],
+        temperature: 0.4,
+        maxOutputTokens: 800,
+      },
+    })
 
-    const firstData = await firstRequest.json()
-    console.log('First response:', JSON.stringify(firstData, null, 2))
+    const firstResponse = firstRequest
+    console.log('First response:', JSON.stringify(firstResponse, null, 2))
 
-    const parts = firstData?.candidates?.[0]?.content?.parts || []
-    const toolCall = parts.find((p: any) => p.functionCall)?.functionCall
+    const toolCall = firstResponse.functionCalls?.[0]
 
     // STEP 2: Jika ada tool call, eksekusi dan kirim hasil ke Gemini
     if (toolCall?.name) {
       console.log('Step 2: Executing tool:', toolCall.name)
       console.log('Tool args:', toolCall.args)
 
-      const args = toolCall.args || {}
+      const args = (toolCall.args || {}) as Record<string, any>
       let toolResult: any = null
 
       try {
@@ -149,12 +137,12 @@ export async function POST(req: NextRequest) {
               toolResult = await rpcGetMenuByBudget(
                 kantinId,
                 Number(args.maxBudget),
-                args.limit
+                typeof args.limit === 'number' ? args.limit : undefined
               )
             } else {
               toolResult = await rpcGetMenuByBudgetGlobal(
                 Number(args.maxBudget),
-                args.limit
+                typeof args.limit === 'number' ? args.limit : undefined
               )
             }
             break
@@ -163,13 +151,13 @@ export async function POST(req: NextRequest) {
             if (kantinId) {
               toolResult = await rpcSearchMenus(
                 kantinId,
-                args.keywords || [],
-                args.limit
+                Array.isArray(args.keywords) ? args.keywords : [],
+                typeof args.limit === 'number' ? args.limit : undefined
               )
             } else {
               toolResult = await rpcSearchMenusGlobal(
-                args.keywords || [],
-                args.limit
+                Array.isArray(args.keywords) ? args.keywords : [],
+                typeof args.limit === 'number' ? args.limit : undefined
               )
             }
             break
@@ -178,38 +166,53 @@ export async function POST(req: NextRequest) {
             if (kantinId) {
               toolResult = await rpcGetMenusByCategory(
                 kantinId,
-                args.category,
-                args.limit
+                typeof args.category === 'string' ? args.category : '',
+                typeof args.limit === 'number' ? args.limit : undefined
               )
             } else {
               toolResult = await rpcGetMenusByCategoryGlobal(
-                args.category,
-                args.limit
+                typeof args.category === 'string' ? args.category : '',
+                typeof args.limit === 'number' ? args.limit : undefined
               )
             }
             break
 
           case 'getCheapestMenus':
             if (kantinId) {
-              toolResult = await rpcGetCheapestMenus(kantinId, args.limit ?? 5)
+              toolResult = await rpcGetCheapestMenus(
+                kantinId, 
+                typeof args.limit === 'number' ? args.limit : 5
+              )
             } else {
-              toolResult = await rpcGetCheapestMenusGlobal(args.limit ?? 5)
+              toolResult = await rpcGetCheapestMenusGlobal(
+                typeof args.limit === 'number' ? args.limit : 5
+              )
             }
             break
 
           case 'getBestValueMenus':
             if (kantinId) {
-              toolResult = await rpcGetBestValueMenus(kantinId, args.limit ?? 5)
+              toolResult = await rpcGetBestValueMenus(
+                kantinId, 
+                typeof args.limit === 'number' ? args.limit : 5
+              )
             } else {
-              toolResult = await rpcGetBestValueMenusGlobal(args.limit ?? 5)
+              toolResult = await rpcGetBestValueMenusGlobal(
+                typeof args.limit === 'number' ? args.limit : 5
+              )
             }
             break
 
           case 'getPopularMenus':
             if (kantinId) {
-              toolResult = await rpcGetPopularMenus(kantinId, args.limit ?? 5)
+              toolResult = await rpcGetPopularMenus(
+                kantinId, 
+                typeof args.limit === 'number' ? args.limit : 5
+              )
             } else {
-              toolResult = await rpcGetPopularMenusGlobal(args.limit ?? 5)
+              toolResult = await rpcGetPopularMenusGlobal(
+                typeof args.limit === 'number' ? args.limit : 5
+              )
             }
             break
 
@@ -217,13 +220,13 @@ export async function POST(req: NextRequest) {
             if (kantinId) {
               toolResult = await rpcGetNewMenus(
                 kantinId,
-                args.daysAgo ?? 30,
-                args.limit ?? 10
+                typeof args.daysAgo === 'number' ? args.daysAgo : 30,
+                typeof args.limit === 'number' ? args.limit : 10
               )
             } else {
               toolResult = await rpcGetNewMenusGlobal(
-                args.daysAgo ?? 30,
-                args.limit ?? 10
+                typeof args.daysAgo === 'number' ? args.daysAgo : 30,
+                typeof args.limit === 'number' ? args.limit : 10
               )
             }
             break
@@ -233,7 +236,7 @@ export async function POST(req: NextRequest) {
               toolResult = await rpcGetMenuCombos(
                 kantinId,
                 Number(args.budget),
-                args.limit ?? 10
+                typeof args.limit === 'number' ? args.limit : 10
               )
             } else {
               toolResult = { error: 'Menu combos hanya tersedia untuk kantin spesifik' }
@@ -250,9 +253,14 @@ export async function POST(req: NextRequest) {
 
           case 'getAllMenus':
             if (kantinId) {
-              toolResult = await rpcGetAllMenus(kantinId, args.limit)
+              toolResult = await rpcGetAllMenus(
+                kantinId, 
+                typeof args.limit === 'number' ? args.limit : undefined
+              )
             } else {
-              toolResult = await rpcGetAllMenusGlobal(args.limit)
+              toolResult = await rpcGetAllMenusGlobal(
+                typeof args.limit === 'number' ? args.limit : undefined
+              )
             }
             break
 
@@ -260,43 +268,134 @@ export async function POST(req: NextRequest) {
           case 'getMenusByBudgetGlobal':
             toolResult = await rpcGetMenuByBudgetGlobal(
               Number(args.maxBudget),
-              args.limit
+              typeof args.limit === 'number' ? args.limit : undefined
             )
             break
 
           case 'searchMenusGlobal':
             toolResult = await rpcSearchMenusGlobal(
-              args.keywords || [],
-              args.limit
+              Array.isArray(args.keywords) ? args.keywords : [],
+              typeof args.limit === 'number' ? args.limit : undefined
             )
             break
 
           case 'getMenusByCategoryGlobal':
             toolResult = await rpcGetMenusByCategoryGlobal(
-              args.category,
-              args.limit
+              typeof args.category === 'string' ? args.category : '',
+              typeof args.limit === 'number' ? args.limit : undefined
             )
             break
 
           case 'getCheapestMenusGlobal':
-            toolResult = await rpcGetCheapestMenusGlobal(args.limit ?? 5)
+            toolResult = await rpcGetCheapestMenusGlobal(
+              typeof args.limit === 'number' ? args.limit : 5
+            )
             break
 
           case 'getBestValueMenusGlobal':
-            toolResult = await rpcGetBestValueMenusGlobal(args.limit ?? 5)
+            toolResult = await rpcGetBestValueMenusGlobal(
+              typeof args.limit === 'number' ? args.limit : 5
+            )
             break
 
           case 'getPopularMenusGlobal':
-            toolResult = await rpcGetPopularMenusGlobal(args.limit ?? 5)
+            toolResult = await rpcGetPopularMenusGlobal(
+              typeof args.limit === 'number' ? args.limit : 5
+            )
             break
 
           case 'getAllMenusGlobal':
-            toolResult = await rpcGetAllMenusGlobal(args.limit)
+            toolResult = await rpcGetAllMenusGlobal(
+              typeof args.limit === 'number' ? args.limit : undefined
+            )
+            break
+
+          // New tools for database-only responses
+          case 'queryMenuDirect':
+            if (kantinId) {
+              toolResult = await rpcQueryMenuDirect(
+                kantinId,
+                typeof args.jenis === 'string' && ['makanan', 'minuman', 'semua'].includes(args.jenis)
+                  ? args.jenis as 'makanan' | 'minuman' | 'semua'
+                  : 'semua',
+                typeof args.sortBy === 'string' && ['harga_asc', 'harga_desc', 'popularitas', 'terbaru'].includes(args.sortBy)
+                  ? args.sortBy as 'harga_asc' | 'harga_desc' | 'popularitas' | 'terbaru'
+                  : 'harga_asc',
+                typeof args.maxPrice === 'number' ? args.maxPrice : undefined,
+                typeof args.minPrice === 'number' ? args.minPrice : undefined,
+                typeof args.tersedia === 'boolean' ? args.tersedia : true,
+                typeof args.limit === 'number' ? args.limit : 1
+              )
+            } else {
+              toolResult = { error: 'queryMenuDirect memerlukan kantinId' }
+            }
+            break
+
+          case 'findMenuByName':
+            if (kantinId) {
+              toolResult = await rpcFindMenuByName(
+                kantinId,
+                typeof args.menuName === 'string' ? args.menuName : '',
+                typeof args.limit === 'number' ? args.limit : 5
+              )
+            } else {
+              toolResult = { error: 'findMenuByName memerlukan kantinId' }
+            }
+            break
+
+          case 'searchMenu':
+            if (kantinId) {
+              toolResult = await rpcSearchMenu(
+                kantinId,
+                typeof args.q === 'string' ? args.q : undefined,
+                Array.isArray(args.kategori) ? args.kategori : undefined,
+                typeof args.maxPrice === 'number' ? args.maxPrice : undefined,
+                typeof args.tersedia === 'boolean' ? args.tersedia : true,
+                typeof args.limit === 'number' ? args.limit : 10
+              )
+            } else {
+              toolResult = { error: 'searchMenu memerlukan kantinId' }
+            }
+            break
+
+          case 'recommendMenu':
+            if (kantinId) {
+              toolResult = await rpcRecommendMenu(
+                kantinId,
+                Number(args.maxPrice),
+                Array.isArray(args.kategori) ? args.kategori : undefined,
+                typeof args.tersedia === 'boolean' ? args.tersedia : true,
+                typeof args.limit === 'number' ? args.limit : 5
+              )
+            } else {
+              toolResult = { error: 'recommendMenu memerlukan kantinId' }
+            }
+            break
+
+          case 'recommendBundle':
+            if (kantinId) {
+              toolResult = await rpcRecommendBundle(
+                kantinId,
+                Number(args.budget),
+                Array.isArray(args.kategori) ? args.kategori : undefined,
+                typeof args.tersedia === 'boolean' ? args.tersedia : true,
+                typeof args.limit === 'number' ? args.limit : 3
+              )
+            } else {
+              toolResult = { error: 'recommendBundle memerlukan kantinId' }
+            }
             break
 
           // Kantin info functions
           case 'getKantinInfo':
-            toolResult = await rpcGetKantinInfo(args.kantinId)
+            const targetKantinId = typeof args.kantinId === 'string' && args.kantinId 
+              ? args.kantinId 
+              : kantinId || ''
+            if (targetKantinId) {
+              toolResult = await rpcGetKantinInfo(targetKantinId)
+            } else {
+              toolResult = { error: 'getKantinInfo memerlukan kantinId' }
+            }
             break
 
           case 'getAllKantins':
@@ -304,53 +403,61 @@ export async function POST(req: NextRequest) {
             break
 
           case 'searchKantins':
-            toolResult = await rpcSearchKantins(args.keywords || [])
+            toolResult = await rpcSearchKantins(
+              Array.isArray(args.keywords) ? args.keywords : []
+            )
             break
 
           // Category functions
           case 'getMakananByCategory':
             toolResult = await rpcGetMakananByCategory(
-              args.category,
-              args.limit
+              typeof args.category === 'string' ? args.category : '',
+              typeof args.limit === 'number' ? args.limit : undefined
             )
             break
 
           case 'getMinumanByCategory':
-            toolResult = await rpcGetMinumanByCategory(args.limit)
+            toolResult = await rpcGetMinumanByCategory(
+              typeof args.limit === 'number' ? args.limit : undefined
+            )
             break
 
           case 'getHealthyMenus':
             toolResult = await rpcGetHealthyMenus(
-              args.keywords || [],
-              args.limit
+              Array.isArray(args.keywords) ? args.keywords : [],
+              typeof args.limit === 'number' ? args.limit : undefined
             )
             break
 
           case 'getBestMealCombo':
             toolResult = await rpcGetBestMealCombo(
               Number(args.budget),
-              args.timeOfDay,
-              args.limit ?? 3
+              typeof args.timeOfDay === 'string' && ['pagi', 'siang', 'malam'].includes(args.timeOfDay) 
+                ? args.timeOfDay as 'pagi' | 'siang' | 'malam'
+                : undefined,
+              typeof args.limit === 'number' ? args.limit : 3
             )
             break
 
           case 'getRecommendationsByTime':
             toolResult = await rpcGetRecommendationsByTime(
-              args.timeOfDay,
-              args.limit
+              typeof args.timeOfDay === 'string' && ['pagi', 'siang', 'malam'].includes(args.timeOfDay)
+                ? args.timeOfDay as 'pagi' | 'siang' | 'malam'
+                : 'pagi',
+              typeof args.limit === 'number' ? args.limit : undefined
             )
             break
 
           case 'getFallbackMenus':
             toolResult = await rpcGetFallbackMenus(
-              kantinId,
-              args.limit
+              kantinId || undefined,
+              typeof args.limit === 'number' ? args.limit : undefined
             )
             break
 
           case 'getMenusUnder10k':
             toolResult = await rpcGetMenusUnder10k(
-              args.limit
+              typeof args.limit === 'number' ? args.limit : undefined
             )
             break
 
@@ -371,63 +478,55 @@ export async function POST(req: NextRequest) {
 
       // STEP 3: Kirim hasil tool ke Gemini untuk generate jawaban final
       console.log('Step 3: Generating final response...')
-      const secondRequest = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
+      
+      // Cek apakah tool result ada data
+      const hasData = Array.isArray(toolResult) ? toolResult.length > 0 : (toolResult && typeof toolResult === 'object' && !toolResult.error)
+      const dataInstruction = hasData 
+        ? '\n\nPENTING: Tool telah mengembalikan data. Data TIDAK kosong. LANGSUNG jawab dengan data tersebut sesuai pertanyaan user. JANGAN bilang "tidak ada jawaban" atau "maaf tidak ada jawaban" karena ada data. Gunakan data tersebut untuk menjawab pertanyaan user dengan tepat.'
+        : '\n\nPENTING: Tool mengembalikan data kosong atau tidak ada data. Katakan "tidak ada" atau "belum ada menu yang sesuai" dengan sopan.'
+      
+      const secondRequest = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: `${SYSTEM_PROMPT}\n\nUser: ${message}\n\nKantin ID: ${kantinId || 'global'}${dataInstruction}` }
+            ],
+          },
+          {
+            role: 'model',
+            parts: [{ functionCall: toolCall }],
+          },
+          {
+            role: 'function',
+            parts: [
               {
-                role: 'user',
-                parts: [
-                  { text: `${SYSTEM_PROMPT}\n\nUser: ${message}\n\nKantin ID: ${kantinId || 'global'}` }
-                ],
-              },
-              {
-                role: 'model',
-                parts: [{ functionCall: toolCall }],
-              },
-              {
-                role: 'function',
-                parts: [
-                  {
-                    functionResponse: {
-                      name: toolCall.name,
-                      response: toolResult,
-                    },
-                  },
-                ],
+                functionResponse: {
+                  name: toolCall.name,
+                  response: toolResult,
+                },
               },
             ],
-            tools: [tools],
-            generationConfig: {
-              temperature: 0.4,
-              maxOutputTokens: 900,
-            },
-          }),
-        }
-      )
-
-      if (!secondRequest.ok) {
-        const errorText = await secondRequest.text()
-        console.error('Gemini API Error (Step 3):', errorText)
-        console.error('Status:', secondRequest.status)
-        return NextResponse.json(
-          { 
-            error: `Gemini API error step 3: ${secondRequest.status}`,
-            details: errorText.substring(0, 200)
           },
-          { status: 500, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
+        ],
+        config: {
+          systemInstruction: SYSTEM_PROMPT,
+          toolConfig: {
+            functionCallingConfig: {
+              mode: FunctionCallingConfigMode.AUTO,
+            },
+          },
+          tools: [{ functionDeclarations: tools.functionDeclarations }],
+          temperature: 0.4,
+          maxOutputTokens: 900,
+        },
+      })
 
-      const secondData = await secondRequest.json()
-      console.log('Second response:', JSON.stringify(secondData, null, 2))
+      const secondResponse = secondRequest
+      console.log('Second response:', JSON.stringify(secondResponse, null, 2))
 
-      let text =
-        secondData?.candidates?.[0]?.content?.parts?.[0]?.text ||
-        'Maaf, tidak ada jawaban.'
+      let text = secondResponse.text || 'Maaf, tidak ada jawaban.'
 
       // Bersihkan markdown formatting
       text = cleanMarkdown(text)
@@ -480,7 +579,7 @@ export async function POST(req: NextRequest) {
           fallbackData = await rpcGetPopularMenusGlobal(5);
         }
         
-        let text = parts?.[0]?.text || 'Maaf, tidak ada jawaban.';
+        let text = firstResponse.text || 'Maaf, tidak ada jawaban.';
         text = cleanMarkdown(text);
         
         return NextResponse.json(
@@ -498,7 +597,7 @@ export async function POST(req: NextRequest) {
 
     // Jika bukan pertanyaan menu, kembalikan response langsung
     console.log('No tool call, returning direct response')
-    let text = parts?.[0]?.text || 'Maaf, tidak ada jawaban.'
+    let text = firstResponse.text || 'Maaf, tidak ada jawaban.'
     text = cleanMarkdown(text)
 
     return NextResponse.json(

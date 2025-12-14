@@ -1,6 +1,6 @@
 'use server'; // Marks all functions in this file as server actions
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI, FunctionCallingConfigMode } from '@google/genai';
 import { tools } from '@/lib/geminiTools';
 import { SYSTEM_PROMPT } from '@/lib/systemPrompt';
 import {
@@ -35,13 +35,34 @@ import {
   rpcGetFallbackMenus,
   rpcGetMenusUnder10k,
   rpcGetHealthyMenus,
+  // New tools for database-only responses
+  rpcFindMenuByName,
+  rpcSearchMenu,
+  rpcRecommendMenu,
+  rpcRecommendBundle,
+  rpcQueryMenuDirect,
 } from '@/lib/aiTools';
-
-// Initialize the client. The SDK automatically picks up the GEMINI_API_KEY from .env.local
-const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function generateContent(prompt: string, kantinId: string) {
   try {
+    // Validasi API key terlebih dahulu
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey.trim() === '') {
+      console.error('GEMINI_API_KEY not configured in environment variables');
+      return {
+        error: 'API key tidak dikonfigurasi. Pastikan GEMINI_API_KEY ada di file .env.local',
+        details: 'Silakan tambahkan GEMINI_API_KEY di file .env.local'
+      };
+    }
+
+    // Validasi format API key (Google Gemini API key biasanya dimulai dengan AIzaSy)
+    if (!apiKey.startsWith('AIzaSy') && !apiKey.startsWith('gen-')) {
+      console.warn('API key format mungkin tidak valid. Google Gemini API key biasanya dimulai dengan AIzaSy');
+    }
+
+    // Initialize the client dengan API key yang sudah divalidasi
+    const ai = new GoogleGenAI({ apiKey });
+
     // Decide the model here: using gemini-2.5-flash as a good starting point
     const modelName = 'gemini-2.5-flash';
 
@@ -50,30 +71,24 @@ export async function generateContent(prompt: string, kantinId: string) {
     console.log('Message:', prompt)
     console.log('KantinId:', kantinId)
     
-    const model = ai.getGenerativeModel({ 
+    const firstRequest = await ai.models.generateContent({
       model: modelName,
-      systemInstruction: SYSTEM_PROMPT
-    });
-
-    const firstRequest = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: `${SYSTEM_PROMPT}\n\nUser: ${prompt}\n\nKantin ID: ${kantinId}` }
-          ],
+      contents: `${SYSTEM_PROMPT}\n\nUser: ${prompt}\n\nKantin ID: ${kantinId || 'global'}`,
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        toolConfig: {
+          functionCallingConfig: {
+            mode: FunctionCallingConfigMode.AUTO,
+          },
         },
-      ],
-      tools: [tools as any],
-      generationConfig: {
+        tools: [{ functionDeclarations: tools.functionDeclarations }],
         temperature: 0.4,
         maxOutputTokens: 800,
       },
     });
 
-    const firstResponse = firstRequest.response;
-    const parts = firstResponse.candidates?.[0]?.content?.parts || [];
-    const toolCall = parts.find((p: any) => p.functionCall)?.functionCall;
+    const firstResponse = firstRequest;
+    const toolCall = firstResponse.functionCalls?.[0];
 
     // STEP 2: Jika ada tool call, eksekusi dan kirim hasil ke Gemini
     if (toolCall?.name) {
@@ -200,9 +215,90 @@ export async function generateContent(prompt: string, kantinId: string) {
             }
             break
 
+          // New tools for database-only responses
+          case 'queryMenuDirect':
+            if (kantinId) {
+              toolResult = await rpcQueryMenuDirect(
+                kantinId,
+                (args as any).jenis && ['makanan', 'minuman', 'semua'].includes((args as any).jenis)
+                  ? (args as any).jenis as 'makanan' | 'minuman' | 'semua'
+                  : 'semua',
+                (args as any).sortBy && ['harga_asc', 'harga_desc', 'popularitas', 'terbaru'].includes((args as any).sortBy)
+                  ? (args as any).sortBy as 'harga_asc' | 'harga_desc' | 'popularitas' | 'terbaru'
+                  : 'harga_asc',
+                (args as any).maxPrice,
+                (args as any).minPrice,
+                (args as any).tersedia !== false,
+                (args as any).limit || 1
+              )
+            } else {
+              toolResult = { error: 'queryMenuDirect memerlukan kantinId' }
+            }
+            break
+
+          case 'findMenuByName':
+            if (kantinId) {
+              toolResult = await rpcFindMenuByName(
+                kantinId,
+                (args as any).menuName || '',
+                (args as any).limit || 5
+              )
+            } else {
+              toolResult = { error: 'findMenuByName memerlukan kantinId' }
+            }
+            break
+
+          case 'searchMenu':
+            if (kantinId) {
+              toolResult = await rpcSearchMenu(
+                kantinId,
+                (args as any).q,
+                (args as any).kategori,
+                (args as any).maxPrice,
+                (args as any).tersedia !== false,
+                (args as any).limit || 10
+              )
+            } else {
+              toolResult = { error: 'searchMenu memerlukan kantinId' }
+            }
+            break
+
+          case 'recommendMenu':
+            if (kantinId) {
+              toolResult = await rpcRecommendMenu(
+                kantinId,
+                Number((args as any).maxPrice),
+                (args as any).kategori,
+                (args as any).tersedia !== false,
+                (args as any).limit || 5
+              )
+            } else {
+              toolResult = { error: 'recommendMenu memerlukan kantinId' }
+            }
+            break
+
+          case 'recommendBundle':
+            if (kantinId) {
+              toolResult = await rpcRecommendBundle(
+                kantinId,
+                Number((args as any).budget),
+                (args as any).kategori,
+                (args as any).tersedia !== false,
+                (args as any).limit || 3
+              )
+            } else {
+              toolResult = { error: 'recommendBundle memerlukan kantinId' }
+            }
+            break
+
           // Kantin info functions
           case 'getKantinInfo':
-            toolResult = await rpcGetKantinInfo((args as any).kantinId)
+            const targetKantinId = (args as any).kantinId || kantinId
+            if (targetKantinId) {
+              toolResult = await rpcGetKantinInfo(targetKantinId)
+            } else {
+              toolResult = { error: 'getKantinInfo memerlukan kantinId' }
+            }
             break
 
           case 'getAllKantins':
@@ -226,6 +322,11 @@ export async function generateContent(prompt: string, kantinId: string) {
             break
 
           case 'getHealthyMenus':
+            toolResult = await rpcGetHealthyMenus(
+              (args as any).keywords || [],
+              (args as any).limit
+            )
+            break
 
           case 'getBestMealCombo':
             toolResult = await rpcGetBestMealCombo(
@@ -254,11 +355,6 @@ export async function generateContent(prompt: string, kantinId: string) {
               (args as any).limit
             )
             break
-            toolResult = await rpcGetHealthyMenus(
-              (args as any).keywords || [],
-              (args as any).limit
-            )
-            break
 
           default:
             console.warn('Unknown tool:', toolCall.name)
@@ -283,12 +379,19 @@ export async function generateContent(prompt: string, kantinId: string) {
         ? { data: toolResult } 
         : toolResult;
       
-      const secondRequest = await model.generateContent({
+      // Cek apakah tool result ada data
+      const hasData = Array.isArray(toolResult) ? toolResult.length > 0 : (toolResult && typeof toolResult === 'object' && !toolResult.error)
+      const dataInstruction = hasData 
+        ? '\n\nPENTING: Tool telah mengembalikan data. Data TIDAK kosong. LANGSUNG jawab dengan data tersebut sesuai pertanyaan user. JANGAN bilang "tidak ada jawaban" atau "maaf tidak ada jawaban" karena ada data. Gunakan data tersebut untuk menjawab pertanyaan user dengan tepat.'
+        : '\n\nPENTING: Tool mengembalikan data kosong atau tidak ada data. Katakan "tidak ada" atau "belum ada menu yang sesuai" dengan sopan.'
+      
+      const secondRequest = await ai.models.generateContent({
+        model: modelName,
         contents: [
           {
             role: 'user',
             parts: [
-              { text: `${SYSTEM_PROMPT}\n\nUser: ${prompt}\n\nKantin ID: ${kantinId}` }
+              { text: `${SYSTEM_PROMPT}\n\nUser: ${prompt}\n\nKantin ID: ${kantinId || 'global'}${dataInstruction}` }
             ],
           },
           {
@@ -307,15 +410,21 @@ export async function generateContent(prompt: string, kantinId: string) {
             ],
           },
         ],
-        tools: [tools as any],
-        generationConfig: {
+        config: {
+          systemInstruction: SYSTEM_PROMPT,
+          toolConfig: {
+            functionCallingConfig: {
+              mode: FunctionCallingConfigMode.AUTO,
+            },
+          },
+          tools: [{ functionDeclarations: tools.functionDeclarations }],
           temperature: 0.4,
           maxOutputTokens: 900,
         },
       });
 
-      const secondResponse = secondRequest.response;
-      let text = secondResponse.text() || 'Maaf, tidak ada jawaban.';
+      const secondResponse = secondRequest;
+      let text = secondResponse.text || 'Maaf, tidak ada jawaban.';
 
       // Bersihkan markdown formatting
       text = cleanMarkdown(text);
@@ -365,7 +474,7 @@ export async function generateContent(prompt: string, kantinId: string) {
           fallbackData = await rpcGetPopularMenusGlobal(5);
         }
         
-        let text = firstResponse.text() || 'Maaf, tidak ada jawaban.';
+        let text = firstResponse.text || 'Maaf, tidak ada jawaban.';
         text = cleanMarkdown(text);
         
         return {
@@ -379,7 +488,7 @@ export async function generateContent(prompt: string, kantinId: string) {
     }
 
     // Jika bukan pertanyaan menu, kembalikan response langsung
-    let text = firstResponse.text() || 'Maaf, tidak ada jawaban.'
+    let text = firstResponse.text || 'Maaf, tidak ada jawaban.'
     text = cleanMarkdown(text)
 
     return {
@@ -389,9 +498,18 @@ export async function generateContent(prompt: string, kantinId: string) {
 
   } catch (error: any) {
     console.error("Error generating content:", error);
+    
+    // Handle API key errors specifically
+    if (error?.message?.includes('API key') || error?.code === 400) {
+      return {
+        error: "API key tidak valid atau tidak dikonfigurasi.",
+        details: "Pastikan GEMINI_API_KEY ada di file .env.local dan valid. Dapatkan API key di https://aistudio.google.com/apikey"
+      };
+    }
+    
     return {
       error: "Failed to generate content.",
-      details: error.message
+      details: error.message || 'Unknown error'
     };
   }
 }

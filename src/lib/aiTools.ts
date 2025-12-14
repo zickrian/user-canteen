@@ -455,15 +455,14 @@ export async function rpcGetKantinInfo(kantinId: string) {
   const { data, error } = await supabaseAdmin
     .from('kantin')
     .select(`
-      *,
-      menu:menu (
-        id,
-        nama_menu,
-        harga,
-        kategori_menu,
-        total_sold,
-        tersedia
-      )
+      id,
+      nama_kantin,
+      jam_buka,
+      jam_tutup,
+      buka_tutup,
+      status,
+      foto_profil,
+      deskripsi
     `)
     .eq('id', kantinId)
     .single()
@@ -474,6 +473,265 @@ export async function rpcGetKantinInfo(kantinId: string) {
   }
   
   return data
+}
+
+/**
+ * Cari menu berdasarkan nama (exact atau partial match)
+ */
+export async function rpcFindMenuByName(
+  kantinId: string,
+  menuName: string,
+  limit?: number
+) {
+  const { data, error } = await supabaseAdmin
+    .from('menu')
+    .select(`
+      *,
+      kantin:kantin_id (
+        id,
+        nama_kantin,
+        status
+      )
+    `)
+    .eq('kantin_id', kantinId)
+    .ilike('nama_menu', `%${menuName}%`)
+    .order('total_sold', { ascending: false })
+    .limit(limit || 5)
+  
+  if (error) {
+    console.error('Error finding menu by name:', error)
+    throw error
+  }
+  
+  return data || []
+}
+
+/**
+ * Cari menu dengan filter lengkap: kata kunci, kategori, budget, tersedia
+ */
+export async function rpcSearchMenu(
+  kantinId: string,
+  q?: string,
+  kategori?: string[],
+  maxPrice?: number,
+  tersedia: boolean = true,
+  limit?: number
+) {
+  let query = supabaseAdmin
+    .from('menu')
+    .select(`
+      *,
+      kantin:kantin_id (
+        id,
+        nama_kantin,
+        status
+      )
+    `)
+    .eq('kantin_id', kantinId)
+  
+  // Filter tersedia
+  if (tersedia) {
+    query = query.eq('tersedia', true)
+  }
+  
+  // Filter kata kunci
+  if (q && q.trim()) {
+    query = query.or(`nama_menu.ilike.%${q}%,deskripsi.ilike.%${q}%`)
+  }
+  
+  // Filter budget
+  if (maxPrice) {
+    query = query.lte('harga', maxPrice)
+  }
+  
+  query = query
+    .order('total_sold', { ascending: false })
+    .limit(limit ? limit * 2 : 20) // Ambil lebih banyak untuk filter kategori
+  
+  const { data, error } = await query
+  
+  if (error) {
+    console.error('Error searching menu:', error)
+    throw error
+  }
+  
+  // Filter kategori secara manual jika ada
+  let filteredData = data || []
+  if (kategori && kategori.length > 0 && filteredData.length > 0) {
+    filteredData = filteredData.filter(menu => {
+      const menuCategories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+      return kategori.some(cat => menuCategories.includes(cat.toLowerCase()))
+    })
+  }
+  
+  // Limit hasil akhir
+  return filteredData.slice(0, limit || 10)
+}
+
+/**
+ * Rekomendasi menu dengan budget dan kategori
+ */
+export async function rpcRecommendMenu(
+  kantinId: string,
+  maxPrice: number,
+  kategori?: string[],
+  tersedia: boolean = true,
+  limit?: number
+) {
+  let query = supabaseAdmin
+    .from('menu')
+    .select(`
+      *,
+      kantin:kantin_id (
+        id,
+        nama_kantin,
+        status
+      )
+    `)
+    .eq('kantin_id', kantinId)
+    .lte('harga', maxPrice)
+  
+  // Filter tersedia
+  if (tersedia) {
+    query = query.eq('tersedia', true)
+  }
+  
+  query = query
+    .order('total_sold', { ascending: false })
+    .order('harga', { ascending: true })
+    .limit(limit ? limit * 2 : 10) // Ambil lebih banyak untuk filter kategori
+  
+  const { data, error } = await query
+  
+  if (error) {
+    console.error('Error recommending menu:', error)
+    throw error
+  }
+  
+  // Filter kategori secara manual jika ada
+  let filteredData = data || []
+  if (kategori && kategori.length > 0 && filteredData.length > 0) {
+    filteredData = filteredData.filter(menu => {
+      const menuCategories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+      return kategori.some(cat => menuCategories.includes(cat.toLowerCase()))
+    })
+  }
+  
+  // Limit hasil akhir
+  return filteredData.slice(0, limit || 5)
+}
+
+/**
+ * Rekomendasi paket makanan + minuman dengan budget
+ */
+export async function rpcRecommendBundle(
+  kantinId: string,
+  budget: number,
+  kategori?: string[],
+  tersedia: boolean = true,
+  limit?: number
+) {
+  try {
+    // Ambil semua menu yang tersedia dalam budget
+    let query = supabaseAdmin
+      .from('menu')
+      .select(`
+        *,
+        kantin:kantin_id (
+          id,
+          nama_kantin,
+          status
+        )
+      `)
+      .eq('kantin_id', kantinId)
+      .lte('harga', budget)
+    
+    if (tersedia) {
+      query = query.eq('tersedia', true)
+    }
+    
+    const { data: allMenus, error } = await query
+      .order('total_sold', { ascending: false })
+      .limit(50)
+    
+    if (error) {
+      console.error('Error getting menus for bundle:', error)
+      throw error
+    }
+    
+    if (!allMenus || allMenus.length === 0) {
+      return []
+    }
+    
+    // Filter makanan (bukan minuman/snack)
+    const makananList = allMenus.filter(menu => {
+      const categories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+      const excludeCategories = ['minuman', 'snack', 'jajanan', 'dessert', 'jajan']
+      return !categories.some((cat: string) => excludeCategories.includes(cat))
+    })
+    
+    // Filter minuman
+    const minumanList = allMenus.filter(menu => {
+      const categories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+      return categories.includes('minuman')
+    })
+    
+    // Filter kategori jika ada
+    let filteredMakanan = makananList
+    let filteredMinuman = minumanList
+    
+    if (kategori && kategori.length > 0) {
+      filteredMakanan = makananList.filter(menu => {
+        const categories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+        return kategori.some(cat => categories.includes(cat.toLowerCase()))
+      })
+      
+      filteredMinuman = minumanList.filter(menu => {
+        const categories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+        return kategori.some(cat => categories.includes(cat.toLowerCase()))
+      })
+    }
+    
+    // Jika filter kategori tidak ada hasil, gunakan semua
+    if (filteredMakanan.length === 0) {
+      filteredMakanan = makananList
+    }
+    if (filteredMinuman.length === 0) {
+      filteredMinuman = minumanList
+    }
+    
+    // Cari kombinasi terbaik
+    const bestCombos: any[] = []
+    
+    for (const makanan of filteredMakanan.slice(0, 10)) {
+      for (const minuman of filteredMinuman.slice(0, 10)) {
+        const total = makanan.harga + minuman.harga
+        if (total <= budget) {
+          const score = (makanan.total_sold || 0) + (minuman.total_sold || 0) - (total / 1000)
+          bestCombos.push({
+            makanan,
+            minuman,
+            total,
+            score,
+            sisa: budget - total
+          })
+        }
+      }
+    }
+    
+    // Sort by score tertinggi dan sisa budget terkecil
+    bestCombos.sort((a, b) => {
+      if (Math.abs(a.score - b.score) < 10) {
+        return a.sisa - b.sisa
+      }
+      return b.score - a.score
+    })
+    
+    return bestCombos.slice(0, limit || 3)
+  } catch (error) {
+    console.error('Error in rpcRecommendBundle:', error)
+    throw error
+  }
 }
 
 /**
@@ -589,6 +847,7 @@ export async function rpcGetMakananByCategory(
 export async function rpcGetMinumanByCategory(
   limit?: number
 ) {
+  // Ambil semua menu yang tersedia
   const { data, error } = await supabaseAdmin
     .from('menu')
     .select(`
@@ -600,16 +859,22 @@ export async function rpcGetMinumanByCategory(
       )
     `)
     .eq('tersedia', true)
-    .contains('kategori_menu', ['minuman'])
     .order('total_sold', { ascending: false })
-    .limit(limit || 10)
+    .limit(50) // Ambil banyak untuk di-filter
   
   if (error) {
     console.error('Error getting minuman by category:', error)
     throw error
   }
   
-  return data
+  // Filter: HANYA minuman
+  const filtered = data?.filter(menu => {
+    const categories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+    return categories.includes('minuman')
+  })
+  
+  // Limit hasil sesuai parameter
+  return filtered?.slice(0, limit || 10)
 }
 
 /**
@@ -866,4 +1131,113 @@ export async function rpcGetMenusUnder10k(
   }
   
   return data
+}
+
+/**
+ * Query menu langsung dengan filter fleksibel
+ * Memberikan akses langsung ke database tanpa perlu kata kunci
+ */
+export async function rpcQueryMenuDirect(
+  kantinId: string,
+  jenis: 'makanan' | 'minuman' | 'semua',
+  sortBy: 'harga_asc' | 'harga_desc' | 'popularitas' | 'terbaru',
+  maxPrice?: number,
+  minPrice?: number,
+  tersedia: boolean = true,
+  limit: number = 1
+) {
+  try {
+    let query = supabaseAdmin
+      .from('menu')
+      .select(`
+        *,
+        kantin:kantin_id (
+          id,
+          nama_kantin,
+          status
+        )
+      `)
+      .eq('kantin_id', kantinId)
+    
+    // Filter tersedia
+    if (tersedia) {
+      query = query.eq('tersedia', true)
+    }
+    
+    // Filter harga
+    if (maxPrice) {
+      query = query.lte('harga', maxPrice)
+    }
+    
+    if (minPrice) {
+      query = query.gte('harga', minPrice)
+    }
+    
+    // Ambil data dulu untuk filter jenis (karena kategori_menu adalah JSONB)
+    query = query.limit(100) // Ambil banyak untuk filter jenis
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('Error querying menu direct:', error)
+      throw error
+    }
+    
+    // Filter jenis secara manual
+    let filteredData = data || []
+    
+    if (jenis === 'makanan') {
+      filteredData = filteredData.filter(menu => {
+        const categories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+        const excludeCategories = ['minuman', 'snack', 'jajanan', 'dessert', 'jajan']
+        return !categories.some((cat: string) => excludeCategories.includes(cat))
+      })
+    } else if (jenis === 'minuman') {
+      filteredData = filteredData.filter(menu => {
+        const categories = (menu.kategori_menu || []).map((cat: string) => cat.toLowerCase())
+        return categories.includes('minuman')
+      })
+    }
+    
+    // Sort data
+    switch (sortBy) {
+      case 'harga_asc':
+        filteredData.sort((a, b) => {
+          if (a.harga !== b.harga) {
+            return Number(a.harga) - Number(b.harga)
+          }
+          return (b.total_sold || 0) - (a.total_sold || 0)
+        })
+        break
+      case 'harga_desc':
+        filteredData.sort((a, b) => {
+          if (a.harga !== b.harga) {
+            return Number(b.harga) - Number(a.harga)
+          }
+          return (b.total_sold || 0) - (a.total_sold || 0)
+        })
+        break
+      case 'popularitas':
+        filteredData.sort((a, b) => {
+          if ((b.total_sold || 0) !== (a.total_sold || 0)) {
+            return (b.total_sold || 0) - (a.total_sold || 0)
+          }
+          return Number(a.harga) - Number(b.harga)
+        })
+        break
+      case 'terbaru':
+        filteredData.sort((a, b) => {
+          const dateA = new Date(a.created_at || 0).getTime()
+          const dateB = new Date(b.created_at || 0).getTime()
+          return dateB - dateA
+        })
+        break
+    }
+    
+    // Limit hasil
+    return filteredData.slice(0, limit)
+  } catch (error) {
+    console.error('Error in rpcQueryMenuDirect:', error)
+    throw error
+  }
 }
