@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import MidtransClient from 'midtrans-client'
-
-// Initialize Midtrans
-const snap = new MidtransClient.Snap({
-  isProduction: false,
-  serverKey: process.env.MIDTRANS_SERVER_KEY!,
-  clientKey: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY!
-})
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,17 +13,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Only handle QRIS in this route
-    if (orderData.paymentMethod === 'cash') {
+    // Only handle CASH in this route
+    if (orderData.paymentMethod !== 'cash') {
       return NextResponse.json(
-        { error: 'Gunakan endpoint /api/orders/create-cash-order untuk pembayaran cash' },
+        { error: 'Endpoint ini hanya untuk pembayaran cash' },
         { status: 400 }
       )
     }
 
-    // Generate unique order IDs
-    const pesananId = crypto.randomUUID() // For database pesanan table
-    const midtransOrderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` // For Midtrans
+    // Generate unique order ID
+    const pesananId = crypto.randomUUID()
 
     // Get next sequential nomor antrian for this kantin
     const { data: nomorAntrianData, error: nomorAntrianError } = await supabaseAdmin
@@ -47,37 +38,7 @@ export async function POST(request: NextRequest) {
 
     const nomorAntrian = nomorAntrianData || 1
 
-    // Create transaction details for Midtrans
-    const transactionDetails = {
-      order_id: midtransOrderId,
-      gross_amount: orderData.grossAmount
-    }
-
-    // Create item details
-    const itemDetails = orderData.items.map((item: any) => ({
-      id: item.menu.id,
-      price: item.menu.harga,
-      quantity: item.quantity,
-      name: item.menu.nama_menu,
-      category: item.menu.kategori_menu?.[0] || 'Makanan'
-    }))
-
-    // Create customer details
-    const customerDetails = {
-      first_name: orderData.customerDetails.nama_pelanggan || 'Pelanggan',
-      email: orderData.customerDetails.email || 'customer@example.com',
-      phone: orderData.customerDetails.nomor_meja || '-'
-    }
-
-    // Create Midtrans transaction
-    const transaction = await (snap as any).createTransaction({
-      transaction_details: transactionDetails,
-      item_details: itemDetails,
-      customer_details: customerDetails,
-      enabled_payments: ['qris']
-    })
-
-    // Save order to database (pesanan table) dengan semua data yang diperlukan
+    // Save order to database (pesanan table)
     const { data: order, error: orderError } = await supabaseAdmin
       .from('pesanan')
       .insert({
@@ -124,15 +85,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Save payment record (pembayaran table)
+    // Save payment record (pembayaran table) with cash status
     const { error: paymentError } = await supabaseAdmin
       .from('pembayaran')
       .insert({
         pesanan_id: pesananId,
-        midtrans_order_id: midtransOrderId,
+        midtrans_order_id: `CASH-${pesananId}`, // Placeholder for cash orders
         gross_amount: orderData.grossAmount,
-        payment_type: 'qris',
-        status: 'pending',
+        payment_type: 'cash',
+        status: 'pending', // Waiting for cashier confirmation
         email_pelanggan: orderData.customerDetails.email,
         nomor_meja: orderData.customerDetails.nomor_meja,
         tipe_pesanan: orderData.customerDetails.tipe_pesanan
@@ -149,15 +110,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       orderId: pesananId,
-      midtransOrderId,
-      token: transaction.token,
-      redirect_url: transaction.redirect_url
+      message: 'Pesanan cash berhasil dibuat. Silakan pembayaran di kasir.'
     })
 
   } catch (error) {
-    console.error('Midtrans error:', error)
+    console.error('Create cash order error:', error)
     return NextResponse.json(
-      { error: 'Terjadi kesalahan saat memproses pembayaran: ' + (error instanceof Error ? error.message : 'Unknown error') },
+      { error: 'Terjadi kesalahan saat membuat pesanan: ' + (error instanceof Error ? error.message : 'Unknown error') },
       { status: 500 }
     )
   }

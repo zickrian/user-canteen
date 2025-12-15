@@ -2,7 +2,7 @@
 
 import { Search, ShoppingCart, X } from 'lucide-react'
 import { useCart } from '@/contexts/CartContext'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface SearchBarProps {
   value: string
@@ -11,8 +11,23 @@ interface SearchBarProps {
 }
 
 export default function SearchBar({ value, onChange, showCart = false }: SearchBarProps) {
+  const router = useRouter()
   const { getItemCount } = useCart()
   const itemCount = getItemCount()
+
+  const handleCheckout = () => {
+    const tableNumber = typeof window !== 'undefined'
+      ? sessionStorage.getItem('table-number')
+      : null
+
+    if (!tableNumber) {
+      alert('Masukkan nomor meja terlebih dahulu sebelum checkout')
+      router.push('/?needTable=1')
+      return
+    }
+
+    router.push('/checkout')
+  }
 
   return (
     <div className="relative w-full">
@@ -41,8 +56,9 @@ export default function SearchBar({ value, onChange, showCart = false }: SearchB
 
         {/* Shopping Cart Icon - only show if showCart is true */}
         {showCart && (
-          <Link
-            href="/checkout"
+          <button
+            type="button"
+            onClick={handleCheckout}
             className="relative p-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
           >
             <ShoppingCart className="h-6 w-6" />
@@ -51,7 +67,7 @@ export default function SearchBar({ value, onChange, showCart = false }: SearchB
                 {itemCount > 99 ? '99+' : itemCount}
               </span>
             )}
-          </Link>
+          </button>
         )}
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import KantinList from '@/components/KantinList'
 import SearchBar from '@/components/SearchBar'
 import MealFilter, { type MealTime } from '@/components/MealFilter'
@@ -10,12 +11,15 @@ import { supabase } from '@/lib/supabase'
 import type { KantinWithRating, Menu } from '@/lib/supabase'
 
 export default function Home() {
+  const searchParams = useSearchParams()
   const [kantins, setKantins] = useState<KantinWithRating[]>([])
   const [filteredKantins, setFilteredKantins] = useState<KantinWithRating[]>([])
   const [menus, setMenus] = useState<Menu[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [mealFilter, setMealFilter] = useState<MealTime>('')
+  const [tableNumber, setTableNumber] = useState('')
+  const [showTableModal, setShowTableModal] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -24,6 +28,26 @@ export default function Home() {
   useEffect(() => {
     filterKantins()
   }, [kantins, searchQuery, mealFilter, menus])
+
+  useEffect(() => {
+    const existing = typeof window !== 'undefined'
+      ? sessionStorage.getItem('table-number')
+      : null
+
+    if (existing) {
+      setTableNumber(existing)
+      setShowTableModal(false)
+    } else {
+      setShowTableModal(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    const needsTable = searchParams.get('needTable')
+    if (needsTable === '1') {
+      setShowTableModal(true)
+    }
+  }, [searchParams])
 
   const fetchData = async () => {
     try {
@@ -122,6 +146,53 @@ export default function Home() {
 
       {/* AI Assistant - Fixed Position Bottom Right */}
       <AIAssistant />
+
+      {showTableModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-6 md:items-center md:pb-0">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-black">Nomor Meja</h3>
+                <p className="text-sm text-gray-600">Masukkan nomor meja Anda sebelum memesan.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTableModal(false)}
+                className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
+                aria-label="Tutup"
+              >
+                <span className="block text-lg leading-none">X</span>
+              </button>
+            </div>
+
+            <input
+              type="text"
+              value={tableNumber}
+              onChange={(e) => setTableNumber(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-black"
+              placeholder="Contoh: 28"
+            />
+
+            <button
+              type="button"
+              onClick={() => {
+                const trimmed = tableNumber.trim()
+                if (!trimmed) return
+                sessionStorage.setItem('table-number', trimmed)
+                setShowTableModal(false)
+              }}
+              disabled={!tableNumber.trim()}
+              className={`mt-4 w-full rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
+                tableNumber.trim()
+                  ? 'bg-black text-white hover:bg-gray-900 active:scale-95'
+                  : 'cursor-not-allowed bg-gray-200 text-gray-400'
+              }`}
+            >
+              Simpan Nomor Meja
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

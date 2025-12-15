@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/contexts/CartContext'
 import { CheckoutForm } from '@/lib/supabase'
@@ -15,6 +15,7 @@ export default function CheckoutPage() {
   const [orderId, setOrderId] = useState<string>('')
   const [midtransOrderId, setMidtransOrderId] = useState<string>('')
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'success' | 'failed'>('pending')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'qris'>('qris')
   const [formData, setFormData] = useState<CheckoutForm>({
     nama_pelanggan: '',
     catatan_pesanan: '',
@@ -23,6 +24,9 @@ export default function CheckoutPage() {
     tipe_pesanan: 'dine_in'
   })
   const [isTableNumberLocked, setIsTableNumberLocked] = useState(false)
+  const [isCheckingTableNumber, setIsCheckingTableNumber] = useState(true)
+  const [showConfirmation, setShowConfirmation] = useState(false)
+  const hasCheckedTableNumber = useRef(false)
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -101,8 +105,17 @@ export default function CheckoutPage() {
         nomor_meja: nomorMeja
       }))
       setIsTableNumberLocked(true)
+      setIsCheckingTableNumber(false)
+      return
     }
-  }, [cart.items])
+
+    if (!hasCheckedTableNumber.current) {
+      hasCheckedTableNumber.current = true
+      alert('Masukkan nomor meja terlebih dahulu sebelum checkout')
+      setIsCheckingTableNumber(false)
+      router.replace('/?needTable=1')
+    }
+  }, [cart.items, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -130,6 +143,12 @@ export default function CheckoutPage() {
       return
     }
 
+    // Show confirmation modal instead of processing directly
+    setShowConfirmation(true)
+  }
+
+  const handleConfirmPayment = async () => {
+    setShowConfirmation(false)
     setLoading(true)
 
     try {
@@ -149,11 +168,16 @@ export default function CheckoutPage() {
         items: itemsForKantin.map(item => ({
           menu: item.menu,
           quantity: item.quantity
-        }))
+        })),
+        paymentMethod: paymentMethod
       }
 
-      // Create Midtrans payment
-      const response = await fetch('/api/midtrans/create-payment', {
+      // Create payment order
+      const endpoint = paymentMethod === 'cash' 
+        ? '/api/orders/create-cash-order' 
+        : '/api/midtrans/create-payment'
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -169,7 +193,14 @@ export default function CheckoutPage() {
         throw new Error(errorMsg)
       }
 
-      // Show QR code
+      // For cash payment, go directly to struk
+      if (paymentMethod === 'cash') {
+        clearCart()
+        router.push(`/struk/${data.orderId}`)
+        return
+      }
+
+      // Show QR code for QRIS
       setOrderId(data.orderId)
       setMidtransOrderId(data.midtransOrderId)
       setQrCode(data.redirect_url)
@@ -189,6 +220,16 @@ export default function CheckoutPage() {
     setPaymentStatus('pending')
     setQrCode('')
     setOrderId('')
+  }
+
+  if (isCheckingTableNumber) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="max-w-4xl mx-auto px-4 py-16 text-center text-gray-700">
+          Memeriksa akses checkout...
+        </div>
+      </div>
+    )
   }
 
   if (cart.items.length === 0 && !showQR) {
@@ -215,7 +256,7 @@ export default function CheckoutPage() {
     return (
       <div className="min-h-screen bg-white">
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <header className="bg-white border-b-2 border-red-600 sticky top-0 z-40">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center gap-4">
               <button
@@ -224,17 +265,19 @@ export default function CheckoutPage() {
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <h1 className="text-xl font-bold text-black">Pembayaran QRIS</h1>
+              <h1 className="text-xl font-bold text-red-600">
+                {paymentMethod === 'qris' ? 'Pembayaran QRIS' : 'Pembayaran Cash'}
+              </h1>
             </div>
           </div>
         </header>
 
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white border-2 border-black rounded-2xl p-8">
+          <div className="bg-white border-2 border-red-600 rounded-2xl p-8">
             <div className="text-center">
-              <QrCode className="h-16 w-16 mx-auto mb-4 text-black" />
+              <QrCode className="h-16 w-16 mx-auto mb-4 text-red-600" />
               
-              <h2 className="text-2xl font-bold text-black mb-2">
+              <h2 className="text-2xl font-bold text-red-600 mb-2">
                 {paymentStatus === 'pending' && 'Scan QR Code untuk Pembayaran'}
                 {paymentStatus === 'success' && 'Pembayaran Berhasil!'}
                 {paymentStatus === 'failed' && 'Pembayaran Gagal'}
@@ -281,13 +324,13 @@ export default function CheckoutPage() {
                   <>
                     <button
                       onClick={handleBackToCart}
-                      className="px-6 py-3 border-2 border-black text-black rounded-lg hover:bg-gray-50"
+                      className="px-6 py-3 border-2 border-red-600 text-red-600 rounded-lg hover:bg-red-50"
                     >
                       Kembali ke Keranjang
                     </button>
                     <button
                       onClick={() => window.location.reload()}
-                      className="px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800"
+                      className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700"
                     >
                       Coba Lagi
                     </button>
@@ -303,6 +346,46 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Confirmation Modal */}
+      {showConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border-2 border-black max-w-sm w-full p-8 shadow-2xl">
+            <div className="text-center">
+              <div className="text-4xl mb-4">
+                {paymentMethod === 'cash' ? '💵' : '📱'}
+              </div>
+              <h2 className="text-2xl font-bold text-black mb-2">Konfirmasi Pembayaran</h2>
+              <p className="text-gray-600 mb-6">
+                Apakah kamu yakin akan melakukan pembayaran menggunakan metode <span className="font-bold text-red-600">{paymentMethod === 'cash' ? 'Cash di Kasir' : 'QRIS'}</span>?
+              </p>
+              
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Total Pembayaran:</span>
+                  <span className="text-2xl font-bold text-red-600">{formatPrice(cart.totalPrice)}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirmation(false)}
+                  className="flex-1 px-4 py-3 border-2 border-black text-black rounded-lg hover:bg-gray-50 font-semibold transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleConfirmPayment}
+                  disabled={loading}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all"
+                >
+                  {loading ? 'Memproses...' : 'Ya, Lanjutkan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 py-4">
@@ -322,7 +405,7 @@ export default function CheckoutPage() {
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Cart Items */}
           <div className="bg-white border-2 border-black rounded-2xl p-6">
-            <h2 className="text-lg font-bold text-black mb-4">Keranjang Belanja</h2>
+            <h2 className="text-lg font-bold text-red-600 mb-4">Keranjang Belanja</h2>
             
             <div className="space-y-4">
               {cart.items.map((item) => (
@@ -373,7 +456,7 @@ export default function CheckoutPage() {
               ))}
             </div>
             
-            <div className="mt-6 pt-4 border-t border-gray-200">
+            <div className="mt-6 pt-4 border-t-2 border-black">
               <div className="flex justify-between items-center">
                 <span className="text-lg font-bold text-black">Total:</span>
                 <span className="text-xl font-bold text-black">{formatPrice(cart.totalPrice)}</span>
@@ -383,7 +466,7 @@ export default function CheckoutPage() {
 
           {/* Customer Information */}
           <div className="bg-white border-2 border-black rounded-2xl p-6">
-            <h2 className="text-lg font-bold text-black mb-4">Informasi Pelanggan</h2>
+            <h2 className="text-lg font-bold text-red-600 mb-4">Informasi Pelanggan</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -472,6 +555,41 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          {/* Payment Method Selection */}
+          <div className="bg-white border-2 border-black rounded-2xl p-6">
+            <h2 className="text-lg font-bold text-red-600 mb-4">Metode Pembayaran</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('cash')}
+                className={`p-4 border-2 rounded-lg transition-all ${
+                  paymentMethod === 'cash'
+                    ? 'border-red-600 bg-red-600 text-white'
+                    : 'border-gray-300 bg-white text-black hover:border-red-600'
+                }`}
+              >
+                <div className="text-2xl mb-2">💵</div>
+                <div className="font-bold">Cash di Kasir</div>
+                <div className="text-sm mt-1 opacity-75">Pembayaran langsung di kasir</div>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('qris')}
+                className={`p-4 border-2 rounded-lg transition-all ${
+                  paymentMethod === 'qris'
+                    ? 'border-red-600 bg-red-600 text-white'
+                    : 'border-gray-300 bg-white text-black hover:border-red-600'
+                }`}
+              >
+                <div className="text-2xl mb-2">📱</div>
+                <div className="font-bold">QRIS</div>
+                <div className="text-sm mt-1 opacity-75">Scan QR code e-wallet</div>
+              </button>
+            </div>
+          </div>
+
           {/* Submit Button */}
           <div className="flex gap-4">
             <button
@@ -484,10 +602,19 @@ export default function CheckoutPage() {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold"
             >
-              <QrCode className="h-5 w-5" />
-              {loading ? 'Memproses...' : `Bayar dengan QRIS ${formatPrice(cart.totalPrice)}`}
+              {paymentMethod === 'cash' ? (
+                <>
+                  💵
+                  {loading ? 'Memproses...' : `Bayar Cash ${formatPrice(cart.totalPrice)}`}
+                </>
+              ) : (
+                <>
+                  <QrCode className="h-5 w-5" />
+                  {loading ? 'Memproses...' : `Bayar dengan QRIS ${formatPrice(cart.totalPrice)}`}
+                </>
+              )}
             </button>
           </div>
         </form>

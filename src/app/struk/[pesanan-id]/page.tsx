@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Printer, ArrowLeft, Mail, CheckCircle, Clock, User, MapPin, Star } from 'lucide-react'
+import { Printer, ArrowLeft, Mail, CheckCircle, Clock, User, MapPin, Star, CreditCard } from 'lucide-react'
 import { Pesanan, DetailPesanan, Kantin, Menu } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import RatingModal, { RatingDisplay } from '@/components/RatingModal'
+
+interface PaymentInfo {
+  payment_type?: string
+  status?: string
+  created_at?: string
+}
 
 export default function StrukPage() {
   const params = useParams()
@@ -15,9 +21,12 @@ export default function StrukPage() {
   const [pesanan, setPesanan] = useState<Pesanan | null>(null)
   const [detailPesanan, setDetailPesanan] = useState<DetailPesanan[]>([])
   const [kantin, setKantin] = useState<Kantin | null>(null)
+  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [emailSent, setEmailSent] = useState(false)
+  const [emailLoading, setEmailLoading] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
   const [showRatingModal, setShowRatingModal] = useState(false)
 
   useEffect(() => {
@@ -71,6 +80,19 @@ export default function StrukPage() {
           setKantin(kantinData)
         }
 
+        // Fetch payment info
+        const { data: paymentData, error: paymentError } = await supabase
+          .from('pembayaran')
+          .select('*')
+          .eq('pesanan_id', pesananId)
+          .single()
+
+        if (paymentError) {
+          console.error('Error fetching payment info:', paymentError)
+        } else {
+          setPaymentInfo(paymentData)
+        }
+
       } catch (error) {
         console.error('Error:', error)
         setError('Terjadi kesalahan yang tidak terduga')
@@ -109,22 +131,35 @@ export default function StrukPage() {
   }
 
   const handleSendEmail = async () => {
-    if (!pesanan) return
+    if (!pesanan || !pesanan.email || !detailPesanan.length) return
+
+    setEmailLoading(true)
+    setEmailError(null)
 
     try {
-      // This would normally call your email service API
-      // For now, we'll simulate the email sending
+      const response = await fetch('/api/email/send-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          pesananId,
+          email: pesanan.email
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setEmailError(data.error || 'Gagal mengirim email')
+        return
+      }
+
       setEmailSent(true)
       setTimeout(() => setEmailSent(false), 3000)
-      
-      // In a real implementation, you would call an API endpoint
-      // await fetch('/api/send-email', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ pesananId, email: pesanan.email })
-      // })
     } catch (error) {
       console.error('Error sending email:', error)
+      setEmailError('Terjadi kesalahan saat mengirim email')
+    } finally {
+      setEmailLoading(false)
     }
   }
 
@@ -205,13 +240,18 @@ export default function StrukPage() {
               <h1 className="text-xl font-bold text-black">Struk Pesanan</h1>
             </div>
             <div className="flex gap-2 print:hidden">
+              {emailError && (
+                <div className="text-red-600 text-sm px-3 py-2 bg-red-50 rounded">
+                  {emailError}
+                </div>
+              )}
               <button
                 onClick={handleSendEmail}
-                disabled={emailSent}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                disabled={emailSent || emailLoading || !pesanan?.email}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Mail className="h-4 w-4" />
-                {emailSent ? 'Terkirim' : 'Kirim Email'}
+                {emailLoading ? 'Mengirim...' : emailSent ? 'Terkirim' : 'Kirim Email'}
               </button>
               <button
                 onClick={handlePrint}
@@ -236,6 +276,39 @@ export default function StrukPage() {
             <h2 className="text-2xl font-bold mb-2">E-KANTIN</h2>
             <p className="text-gray-300 text-sm">Struk Pesanan Elektronik</p>
           </div>
+
+          {/* Payment Status */}
+          {paymentInfo && (
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg mb-6 border border-blue-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-full ${
+                    paymentInfo.status === 'settlement' 
+                      ? 'bg-green-100' 
+                      : 'bg-yellow-100'
+                  }`}>
+                    {paymentInfo.status === 'settlement' ? (
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    ) : (
+                      <Clock className="h-6 w-6 text-yellow-600" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Status Pembayaran</p>
+                    <p className="text-lg font-bold text-black">
+                      {paymentInfo.status === 'settlement' ? '✓ Sudah Dibayar' : '⏳ Menunggu Pembayaran'}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-600">Metode</p>
+                  <p className="text-lg font-bold text-black capitalize">
+                    {paymentInfo.payment_type === 'cash' ? 'Cash' : 'QRIS'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Pesanan Info */}
           <div className="p-8 space-y-6">

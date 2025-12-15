@@ -9,7 +9,6 @@ import { supabase } from '@/lib/supabase'
 import AIAssistant from '@/components/AIAssistant'
 import MenuCard from '@/components/MenuCard'
 import { useCart } from '@/contexts/CartContext'
-import Link from 'next/link'
 
 export default function KantinDetailPage() {
   const params = useParams()
@@ -119,9 +118,6 @@ export default function KantinDetailPage() {
       // keep both keys populated so nomor meja terbagi ke semua kios
       sessionStorage.setItem(globalKey, initialTable)
       sessionStorage.setItem(kantinKey, initialTable)
-      setShowTableModal(false)
-    } else {
-      setShowTableModal(true)
     }
   }, [kantinId])
 
@@ -144,6 +140,25 @@ export default function KantinDetailPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(price)
+  }
+
+  const handleCheckoutClick = () => {
+    const savedGlobal = typeof window !== 'undefined'
+      ? sessionStorage.getItem('table-number')
+      : null
+    const activeTableNumber = tableNumber || savedGlobal
+
+    if (!activeTableNumber) {
+      setShowTableModal(true)
+      return
+    }
+
+    if (activeTableNumber) {
+      sessionStorage.setItem('table-number', activeTableNumber)
+      sessionStorage.setItem(`table-number-${kantinId}`, activeTableNumber)
+    }
+
+    router.push('/checkout')
   }
 
   const renderStars = (rating: number) => {
@@ -320,8 +335,9 @@ export default function KantinDetailPage() {
               <Pencil className="h-5 w-5" />
             </button>
           </div>
-          <Link
-            href="/checkout"
+          <button
+            type="button"
+            onClick={handleCheckoutClick}
             className="relative p-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
             aria-label="Keranjang belanja"
           >
@@ -331,7 +347,7 @@ export default function KantinDetailPage() {
                 {itemCount > 99 ? '99+' : itemCount}
               </span>
             )}
-          </Link>
+          </button>
         </div>
 
         {/* Category Nav */}

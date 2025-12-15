@@ -28,6 +28,48 @@ export async function POST(request: NextRequest) {
     const notification = JSON.parse(body)
     const { order_id, transaction_status, fraud_status } = notification
 
+    // Find payment record by midtrans order id
+    const { data: paymentData, error: paymentFetchError } = await supabaseAdmin
+      .from('pembayaran')
+      .select('pesanan_id')
+      .eq('midtrans_order_id', order_id)
+      .single()
+
+    if (paymentFetchError || !paymentData) {
+      console.error('Payment record not found:', paymentFetchError)
+      return NextResponse.json(
+        { error: 'Payment record not found' },
+        { status: 404 }
+      )
+    }
+
+    const pesananId = paymentData.pesanan_id
+
+    // Update payment status
+    let paymentStatus = 'pending'
+    if (transaction_status === 'settlement') {
+      paymentStatus = 'settlement'
+    } else if (transaction_status === 'expire') {
+      paymentStatus = 'expire'
+    } else if (transaction_status === 'cancel') {
+      paymentStatus = 'cancel'
+    } else if (transaction_status === 'deny') {
+      paymentStatus = 'deny'
+    }
+
+    const { error: paymentUpdateError } = await supabaseAdmin
+      .from('pembayaran')
+      .update({
+        status: paymentStatus,
+        midtrans_transaction_id: notification.transaction_id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('midtrans_order_id', order_id)
+
+    if (paymentUpdateError) {
+      console.error('Error updating payment record:', paymentUpdateError)
+    }
+
     // Update order status in database
     let newStatus = 'menunggu'
     
@@ -45,20 +87,16 @@ export async function POST(request: NextRequest) {
       newStatus = 'menunggu'
     }
 
-    const { error } = await supabaseAdmin
+    const { error: pesananUpdateError } = await supabaseAdmin
       .from('pesanan')
       .update({ 
         status: newStatus,
         updated_at: new Date().toISOString()
       })
-      .eq('id', order_id)
+      .eq('id', pesananId)
 
-    if (error) {
-      console.error('Error updating order status:', error)
-      return NextResponse.json(
-        { error: 'Failed to update order status' },
-        { status: 500 }
-      )
+    if (pesananUpdateError) {
+      console.error('Error updating pesanan status:', pesananUpdateError)
     }
 
     return NextResponse.json({ success: true })
