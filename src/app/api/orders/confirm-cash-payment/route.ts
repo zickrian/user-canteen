@@ -18,9 +18,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch payment record
+    // Fetch payment record from pembayaran_cash
     const { data: paymentData, error: paymentFetchError } = await supabaseAdmin
-      .from('pembayaran')
+      .from('pembayaran_cash')
       .select('*')
       .eq('pesanan_id', pesananId)
       .single()
@@ -32,19 +32,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Only update cash payments
-    if (paymentData.payment_type !== 'cash') {
-      return NextResponse.json(
-        { error: 'Endpoint ini hanya untuk pembayaran cash' },
-        { status: 400 }
-      )
-    }
-
-    // Update payment status to settlement
+    // Update payment status to dikonfirmasi
     const { error: paymentUpdateError } = await supabaseAdmin
-      .from('pembayaran')
+      .from('pembayaran_cash')
       .update({
-        status: 'settlement',
+        status: 'dikonfirmasi',
+        confirmed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('pesanan_id', pesananId)
@@ -86,15 +79,30 @@ export async function POST(request: NextRequest) {
       // Continue despite email error - payment is already updated
     } else if (pesananData.email) {
       // Fetch order items
-      const { data: detailItems, error: detailError } = await supabaseAdmin
+      const { data: detailItemsRaw, error: detailError } = await supabaseAdmin
         .from('detail_pesanan')
-        .select('*, menu_id(*)')
+        .select('*')
         .eq('pesanan_id', pesananId)
+
+      // Manual join to menu (no FK defined)
+      let detailItems = detailItemsRaw || []
+      if (!detailError && detailItems.length) {
+        const menuIds = detailItems.map((d: any) => d.menu_id)
+        const { data: menus } = await supabaseAdmin
+          .from('menu')
+          .select('id, nama_menu, harga')
+          .in('id', menuIds)
+        const menuMap = new Map((menus || []).map((m: any) => [m.id, m]))
+        detailItems = detailItems.map((d: any) => ({
+          ...d,
+          menu: menuMap.get(d.menu_id) || null,
+        }))
+      }
 
       // Fetch kantin name
       const { data: kantinData, error: kantinError } = await supabaseAdmin
         .from('kantin')
-        .select('nama')
+        .select('nama_kantin')
         .eq('id', pesananData.kantin_id)
         .single()
 
@@ -106,9 +114,9 @@ export async function POST(request: NextRequest) {
           namaPemesan: pesananData.nama_pemesan,
           nomorMeja: pesananData.nomor_meja,
           tipePesanan: pesananData.tipe_pesanan,
-          kantinName: kantinData.nama,
+          kantinName: kantinData.nama_kantin,
           items: detailItems.map((item: any) => ({
-            nama: item.menu_id?.nama || 'Menu',
+            nama: item.menu?.nama_menu || 'Menu',
             jumlah: item.jumlah,
             hargaSatuan: item.harga_satuan,
             subtotal: item.subtotal

@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Printer, ArrowLeft, Mail, CheckCircle, Clock, User, MapPin, Star, CreditCard } from 'lucide-react'
-import { Pesanan, DetailPesanan, Kantin, Menu } from '@/lib/supabase'
-import { supabase } from '@/lib/supabase'
+import { Pesanan, DetailPesanan, Kantin } from '@/lib/supabase'
 import RatingModal, { RatingDisplay } from '@/components/RatingModal'
 
 interface PaymentInfo {
@@ -35,63 +34,19 @@ export default function StrukPage() {
         setLoading(true)
         setError(null)
 
-        // Fetch pesanan details
-        const { data: pesananData, error: pesananError } = await supabase
-          .from('pesanan')
-          .select('*')
-          .eq('id', pesananId)
-          .single()
+        const res = await fetch(`/api/orders/receipt/${pesananId}`)
+        const payload = await res.json()
 
-        if (pesananError) {
-          console.error('Error fetching pesanan:', pesananError)
-          setError('Pesanan tidak ditemukan')
+        if (!res.ok) {
+          console.error('Error fetching receipt:', payload)
+          setError(payload.error || 'Pesanan tidak ditemukan')
           return
         }
 
-        setPesanan(pesananData)
-
-        // Fetch detail pesanan with menu info
-        const { data: detailData, error: detailError } = await supabase
-          .from('detail_pesanan')
-          .select(`
-            *,
-            menu (*)
-          `)
-          .eq('pesanan_id', pesananId)
-
-        if (detailError) {
-          console.error('Error fetching detail pesanan:', detailError)
-          setError('Gagal memuat detail pesanan')
-          return
-        }
-
-        setDetailPesanan(detailData || [])
-
-        // Fetch kantin info
-        const { data: kantinData, error: kantinError } = await supabase
-          .from('kantin')
-          .select('*')
-          .eq('id', pesananData.kantin_id)
-          .single()
-
-        if (kantinError) {
-          console.error('Error fetching kantin:', kantinError)
-        } else {
-          setKantin(kantinData)
-        }
-
-        // Fetch payment info
-        const { data: paymentData, error: paymentError } = await supabase
-          .from('pembayaran')
-          .select('*')
-          .eq('pesanan_id', pesananId)
-          .single()
-
-        if (paymentError) {
-          console.error('Error fetching payment info:', paymentError)
-        } else {
-          setPaymentInfo(paymentData)
-        }
+        setPesanan(payload.pesanan as Pesanan)
+        setDetailPesanan((payload.detailPesanan || []) as DetailPesanan[])
+        setKantin(payload.kantin as Kantin)
+        setPaymentInfo((payload.paymentUi || null) as PaymentInfo | null)
 
       } catch (error) {
         console.error('Error:', error)
@@ -103,6 +58,20 @@ export default function StrukPage() {
 
     if (pesananId) {
       fetchPesananData()
+      // Poll payment status until settled
+      const interval = setInterval(() => {
+        fetch(`/api/orders/receipt/${pesananId}`)
+          .then((r) => r.json())
+          .then((payload) => {
+            const ui: PaymentInfo | null = payload.paymentUi || null
+            if (ui) setPaymentInfo(ui)
+            if (ui?.status === 'settlement') {
+              clearInterval(interval)
+            }
+          })
+          .catch(() => {})
+      }, 3000)
+      return () => clearInterval(interval)
     }
   }, [pesananId])
 
@@ -229,8 +198,8 @@ export default function StrukPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => router.back()}
                 className="p-2 hover:bg-gray-100 rounded-lg print:hidden"
@@ -239,7 +208,7 @@ export default function StrukPage() {
               </button>
               <h1 className="text-xl font-bold text-black">Struk Pesanan</h1>
             </div>
-            <div className="flex gap-2 print:hidden">
+            <div className="flex gap-2 print:hidden w-full sm:w-auto justify-end">
               {emailError && (
                 <div className="text-red-600 text-sm px-3 py-2 bg-red-50 rounded">
                   {emailError}
@@ -269,7 +238,7 @@ export default function StrukPage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           {/* Struk Header */}
-          <div className="bg-gradient-to-r from-black to-gray-800 text-white p-8 text-center">
+          <div className="bg-linear-to-r from-black to-gray-800 text-white p-8 text-center">
             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-black font-bold text-2xl">E</span>
             </div>
@@ -279,7 +248,7 @@ export default function StrukPage() {
 
           {/* Payment Status */}
           {paymentInfo && (
-            <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg mb-6 border border-blue-200">
+            <div className="bg-linear-to-r from-blue-50 to-blue-100 p-6 rounded-lg mb-6 border border-blue-200">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-full ${
@@ -413,15 +382,7 @@ export default function StrukPage() {
               </div>
             </div>
 
-            {/* QR Code Placeholder */}
-            <div className="text-center py-6 border-t border-gray-200">
-              <div className="w-32 h-32 bg-gray-200 rounded-lg mx-auto mb-3 flex items-center justify-center">
-                <span className="text-gray-500 text-sm">QR Code</span>
-              </div>
-              <p className="text-sm text-gray-600">
-                Scan QR code untuk melihat detail pesanan
-              </p>
-            </div>
+            {/* QR Code removed as requested */}
 
             {/* Footer */}
             <div className="text-center pt-6 border-t border-gray-200">

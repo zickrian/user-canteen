@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { sendEmail, generateReceiptHTML } from '@/lib/brevo'
 
 export async function POST(request: NextRequest) {
@@ -13,8 +13,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate email config early to provide clear error
+    const apiKey = process.env.BREVO_API_KEY
+    const senderEmail = process.env.BREVO_SENDER_EMAIL
+    if (!apiKey || !senderEmail) {
+      const missing = [!apiKey ? 'BREVO_API_KEY' : null, !senderEmail ? 'BREVO_SENDER_EMAIL' : null]
+        .filter(Boolean)
+        .join(', ')
+      return NextResponse.json(
+        { error: `Konfigurasi email belum diset (${missing}). Mohon set env di server.` },
+        { status: 400 }
+      )
+    }
+
     // Fetch pesanan details
-    const { data: pesanan, error: pesananError } = await supabase
+    const { data: pesanan, error: pesananError } = await supabaseAdmin
       .from('pesanan')
       .select('*')
       .eq('id', pesananId)
@@ -27,24 +40,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch detail pesanan with menu info
-    const { data: detailPesanan, error: detailError } = await supabase
+    // Fetch detail pesanan
+    const { data: detailPesananRaw, error: detailError } = await supabaseAdmin
       .from('detail_pesanan')
-      .select(`
-        *,
-        menu (*)
-      `)
+      .select('*')
       .eq('pesanan_id', pesananId)
 
-    if (detailError || !detailPesanan) {
+    if (detailError || !detailPesananRaw) {
       return NextResponse.json(
         { error: 'Gagal memuat detail pesanan' },
         { status: 500 }
       )
     }
 
+    // Manual join to menu
+    const menuIds = detailPesananRaw.map((d: any) => d.menu_id)
+    const { data: menus } = await supabaseAdmin
+      .from('menu')
+      .select('id, nama_menu, harga')
+      .in('id', menuIds)
+    const menuMap = new Map((menus || []).map((m: any) => [m.id, m]))
+    const detailPesanan = detailPesananRaw.map((d: any) => ({
+      ...d,
+      menu: menuMap.get(d.menu_id) || null,
+    }))
+
     // Fetch kantin info
-    const { data: kantin, error: kantinError } = await supabase
+    const { data: kantin, error: kantinError } = await supabaseAdmin
       .from('kantin')
       .select('nama_kantin')
       .eq('id', pesanan.kantin_id)
@@ -57,16 +79,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch payment info
-    const { data: paymentInfo, error: paymentError } = await supabase
+    // Fetch payment info (qris or cash)
+    const { data: paymentInfo } = await supabaseAdmin
       .from('pembayaran')
       .select('*')
       .eq('pesanan_id', pesananId)
-      .single()
+      .maybeSingle()
 
-    if (paymentError) {
-      console.error('Error fetching payment info:', paymentError)
-    }
+    const { data: paymentCash } = await supabaseAdmin
+      .from('pembayaran_cash')
+      .select('*')
+      .eq('pesanan_id', pesananId)
+      .maybeSingle()
 
     // Prepare email data
     const emailData = {
@@ -83,8 +107,8 @@ export async function POST(request: NextRequest) {
         subtotal: item.subtotal
       })),
       totalHarga: pesanan.total_harga,
-      paymentMethod: paymentInfo?.payment_type || 'unknown',
-      paymentStatus: paymentInfo?.status || 'pending',
+      paymentMethod: paymentInfo?.payment_type || (paymentCash ? 'cash' : 'unknown'),
+      paymentStatus: paymentInfo?.status || (paymentCash ? (paymentCash.status === 'dikonfirmasi' ? 'settlement' : 'pending') : 'pending'),
       createdAt: pesanan.created_at
     }
 

@@ -85,15 +85,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Save payment record (pembayaran table) with cash status
+    // Save payment record to pembayaran_cash table
     const { error: paymentError } = await supabaseAdmin
-      .from('pembayaran')
+      .from('pembayaran_cash')
       .insert({
         pesanan_id: pesananId,
-        midtrans_order_id: `CASH-${pesananId}`, // Placeholder for cash orders
+        kantin_id: orderData.kantinId,
         gross_amount: orderData.grossAmount,
-        payment_type: 'cash',
-        status: 'pending', // Waiting for cashier confirmation
+        status: 'menunggu_pembayaran',
         email_pelanggan: orderData.customerDetails.email,
         nomor_meja: orderData.customerDetails.nomor_meja,
         tipe_pesanan: orderData.customerDetails.tipe_pesanan

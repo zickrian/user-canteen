@@ -16,8 +16,9 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     // Use Brevo SMTP via API
     const apiKey = process.env.BREVO_API_KEY
-    if (!apiKey) {
-      console.error('BREVO_API_KEY is not set')
+    const senderEmail = process.env.BREVO_SENDER_EMAIL
+    if (!apiKey || !senderEmail) {
+      console.error('Brevo config missing:', { hasApiKey: !!apiKey, hasSenderEmail: !!senderEmail })
       return false
     }
 
@@ -31,7 +32,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       body: JSON.stringify({
         sender: {
           name: process.env.BREVO_SENDER_NAME || 'E-Kantin',
-          email: process.env.BREVO_SENDER_EMAIL || '9e19cb001@smtp-brevo.com'
+          email: senderEmail
         },
         to: [
           {
