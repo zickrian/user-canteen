@@ -99,6 +99,42 @@ export async function POST(request: NextRequest) {
       console.error('Error updating pesanan status:', pesananUpdateError)
     }
 
+    // Update kantin balance jika pembayaran settlement
+    if (transaction_status === 'settlement') {
+      // Get pesanan details untuk mendapatkan kantin_id dan total_harga
+      const { data: pesananData } = await supabaseAdmin
+        .from('pesanan')
+        .select('kantin_id, total_harga')
+        .eq('id', pesananId)
+        .single()
+
+      if (pesananData) {
+        // Get current balance
+        const { data: kantinData } = await supabaseAdmin
+          .from('kantin')
+          .select('balance')
+          .eq('id', pesananData.kantin_id)
+          .single()
+
+        const currentBalance = kantinData?.balance || 0
+        // Tambahkan hanya total_harga pesanan ini, bukan total keseluruhan
+        const newBalance = currentBalance + pesananData.total_harga
+
+        // Update balance
+        const { error: balanceError } = await supabaseAdmin
+          .from('kantin')
+          .update({ 
+            balance: newBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', pesananData.kantin_id)
+
+        if (balanceError) {
+          console.error('Error updating kantin balance:', balanceError)
+        }
+      }
+    }
+
     return NextResponse.json({ success: true })
 
   } catch (error) {

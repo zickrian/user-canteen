@@ -1,10 +1,16 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/contexts/CartContext'
-import { CheckoutForm } from '@/lib/supabase'
-import { ArrowLeft, Plus, Minus, Trash2, Clock, User, Mail, Table, QrCode } from 'lucide-react'
+import { CheckoutForm, CartItem, Kantin } from '@/lib/supabase'
+import { ArrowLeft, Plus, Minus, Trash2, Clock, User, Mail, Table, QrCode, Store } from 'lucide-react'
+
+type KiosGroup = {
+  kantin: Kantin
+  items: CartItem[]
+  subtotal: number
+}
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -12,10 +18,9 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false)
   const [showQR, setShowQR] = useState(false)
   const [qrCode, setQrCode] = useState<string>('')
-  const [orderId, setOrderId] = useState<string>('')
   const [midtransOrderId, setMidtransOrderId] = useState<string>('')
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'success' | 'failed'>('pending')
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'qris'>('qris')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'qris'>('cash')
   const [formData, setFormData] = useState<CheckoutForm>({
     nama_pelanggan: '',
     catatan_pesanan: '',
@@ -26,7 +31,31 @@ export default function CheckoutPage() {
   const [isTableNumberLocked, setIsTableNumberLocked] = useState(false)
   const [isCheckingTableNumber, setIsCheckingTableNumber] = useState(true)
   const [showConfirmation, setShowConfirmation] = useState(false)
+  const [multiKiosOrders, setMultiKiosOrders] = useState<{ pesananId: string; kantinId: string; kantinName: string; subtotal: number }[]>([])
   const hasCheckedTableNumber = useRef(false)
+
+  // Group cart items by kios
+  const kiosGroups = useMemo((): KiosGroup[] => {
+    const groups: Map<string, KiosGroup> = new Map()
+    
+    cart.items.forEach(item => {
+      const kantinId = item.kantin.id
+      if (!groups.has(kantinId)) {
+        groups.set(kantinId, {
+          kantin: item.kantin,
+          items: [],
+          subtotal: 0
+        })
+      }
+      const group = groups.get(kantinId)!
+      group.items.push(item)
+      group.subtotal += item.menu.harga * item.quantity
+    })
+    
+    return Array.from(groups.values())
+  }, [cart.items])
+
+  const isMultiKios = kiosGroups.length > 1
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -36,6 +65,7 @@ export default function CheckoutPage() {
       maximumFractionDigits: 0,
     }).format(price)
   }
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -62,7 +92,12 @@ export default function CheckoutPage() {
         setPaymentStatus('success')
         setTimeout(() => {
           clearCart()
-          router.push(`/struk/${data.pesananId}`)
+          // For multi-kios, redirect to preview with orders
+          if (isMultiKios && multiKiosOrders.length > 0) {
+            router.push(`/struk/preview?orders=${encodeURIComponent(JSON.stringify(multiKiosOrders))}&paymentMethod=qris&paid=true&email=${encodeURIComponent(formData.email)}`)
+          } else {
+            router.push(`/struk/${data.pesananId}`)
+          }
         }, 2000)
       } else if (['expire', 'cancel', 'deny'].includes(data.status)) {
         setPaymentStatus('failed')
@@ -78,7 +113,7 @@ export default function CheckoutPage() {
     if (showQR && paymentStatus === 'pending' && midtransOrderId) {
       interval = setInterval(() => {
         checkPaymentStatus(midtransOrderId)
-      }, 3000) // Check every 3 seconds
+      }, 3000)
     }
 
     return () => {
@@ -130,36 +165,74 @@ export default function CheckoutPage() {
       return
     }
 
-    // Validasi email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(formData.email.trim())) {
       alert('Format email tidak valid')
       return
     }
 
-    // Validasi nomor meja wajib untuk kedua tipe pesanan
     if (!formData.nomor_meja.trim()) {
       alert('Nomor meja wajib diisi untuk pengiriman pesanan')
       return
     }
 
-    // Show confirmation modal instead of processing directly
     setShowConfirmation(true)
   }
+
 
   const handleConfirmPayment = async () => {
     setShowConfirmation(false)
     setLoading(true)
 
     try {
-      // Group items by kantin (for now, we'll process one kantin at a time)
-      const firstKantinId = cart.items[0].kantin.id
-      const itemsForKantin = cart.items.filter(item => item.kantin.id === firstKantinId)
-      
-      if (cart.items.some(item => item.kantin.id !== firstKantinId)) {
-        alert('Saat ini hanya bisa memesan dari satu kantin saja')
+      if (isMultiKios) {
+        // Multi-kios checkout
+        const kiosOrders = kiosGroups.map(group => ({
+          kantinId: group.kantin.id,
+          kantinName: group.kantin.nama_kantin,
+          items: group.items.map(item => ({
+            menu: item.menu,
+            quantity: item.quantity
+          })),
+          subtotal: group.subtotal
+        }))
+
+        const response = await fetch('/api/orders/create-multi-kios-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            kiosOrders,
+            customerDetails: formData,
+            paymentMethod: paymentMethod,
+            grossAmount: cart.totalPrice
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Gagal membuat pesanan')
+        }
+
+        setMultiKiosOrders(data.orders)
+
+        // For QRIS, show QR code
+        if (paymentMethod === 'qris' && data.redirect_url) {
+          setMidtransOrderId(data.midtransOrderId)
+          setQrCode(data.redirect_url)
+          setShowQR(true)
+          return
+        }
+
+        // For cash, redirect to receipt preview
+        clearCart()
+        router.push(`/struk/preview?orders=${encodeURIComponent(JSON.stringify(data.orders))}&paymentMethod=cash&email=${encodeURIComponent(formData.email)}`)
         return
       }
+
+      // Single kios checkout (existing logic)
+      const firstKantinId = cart.items[0].kantin.id
+      const itemsForKantin = cart.items.filter(item => item.kantin.id === firstKantinId)
 
       const orderData = {
         kantinId: firstKantinId,
@@ -172,44 +245,35 @@ export default function CheckoutPage() {
         paymentMethod: paymentMethod
       }
 
-      // Create payment order
       const endpoint = paymentMethod === 'cash' 
         ? '/api/orders/create-cash-order' 
         : '/api/midtrans/create-payment'
       
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderData }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        const errorMsg = data.error || 'Gagal membuat pembayaran'
-        console.error('API Error:', errorMsg)
-        throw new Error(errorMsg)
+        throw new Error(data.error || 'Gagal membuat pembayaran')
       }
 
-      // For cash payment, go directly to struk
       if (paymentMethod === 'cash') {
         clearCart()
         router.push(`/struk/${data.orderId}`)
         return
       }
 
-      // Show QR code for QRIS
-      setOrderId(data.orderId)
       setMidtransOrderId(data.midtransOrderId)
       setQrCode(data.redirect_url)
       setShowQR(true)
 
     } catch (error) {
       console.error('Error creating payment:', error)
-      const errorMsg = error instanceof Error ? error.message : 'Terjadi kesalahan saat membuat pesanan. Silakan coba lagi.'
-      alert(errorMsg)
+      alert(error instanceof Error ? error.message : 'Terjadi kesalahan saat membuat pesanan.')
     } finally {
       setLoading(false)
     }
@@ -219,7 +283,7 @@ export default function CheckoutPage() {
     setShowQR(false)
     setPaymentStatus('pending')
     setQrCode('')
-    setOrderId('')
+    setMidtransOrderId('')
   }
 
   if (isCheckingTableNumber) {
@@ -252,22 +316,17 @@ export default function CheckoutPage() {
     )
   }
 
+
   if (showQR) {
     return (
       <div className="min-h-screen bg-white">
-        {/* Header */}
         <header className="bg-white border-b-2 border-red-600 sticky top-0 z-40">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center gap-4">
-              <button
-                onClick={handleBackToCart}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
+              <button onClick={handleBackToCart} className="p-2 hover:bg-gray-100 rounded-lg">
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <h1 className="text-xl font-bold text-red-600">
-                {paymentMethod === 'qris' ? 'Pembayaran QRIS' : 'Pembayaran Cash'}
-              </h1>
+              <h1 className="text-xl font-bold text-red-600">Pembayaran QRIS</h1>
             </div>
           </div>
         </header>
@@ -302,36 +361,22 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {paymentStatus === 'success' && (
-                <div className="text-6xl mb-4">✅</div>
-              )}
-
-              {paymentStatus === 'failed' && (
-                <div className="text-6xl mb-4">❌</div>
-              )}
+              {paymentStatus === 'success' && <div className="text-6xl mb-4">✅</div>}
+              {paymentStatus === 'failed' && <div className="text-6xl mb-4">❌</div>}
 
               <div className="flex gap-4 justify-center">
                 {paymentStatus === 'pending' && (
-                  <button
-                    onClick={handleBackToCart}
-                    className="px-6 py-3 border-2 border-black text-black rounded-lg hover:bg-gray-50"
-                  >
+                  <button onClick={handleBackToCart} className="px-6 py-3 border-2 border-black text-black rounded-lg hover:bg-gray-50">
                     Kembali ke Keranjang
                   </button>
                 )}
                 
                 {paymentStatus === 'failed' && (
                   <>
-                    <button
-                      onClick={handleBackToCart}
-                      className="px-6 py-3 border-2 border-red-600 text-red-600 rounded-lg hover:bg-red-50"
-                    >
+                    <button onClick={handleBackToCart} className="px-6 py-3 border-2 border-red-600 text-red-600 rounded-lg hover:bg-red-50">
                       Kembali ke Keranjang
                     </button>
-                    <button
-                      onClick={() => window.location.reload()}
-                      className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                    >
+                    <button onClick={() => window.location.reload()} className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700">
                       Coba Lagi
                     </button>
                   </>
@@ -344,6 +389,7 @@ export default function CheckoutPage() {
     )
   }
 
+
   return (
     <div className="min-h-screen bg-white">
       {/* Confirmation Modal */}
@@ -351,10 +397,18 @@ export default function CheckoutPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
             <div className="text-center">
-              <div className="text-4xl mb-4">
-                {paymentMethod === 'cash' ? '💵' : '📱'}
-              </div>
+              <div className="text-4xl mb-4">{paymentMethod === 'cash' ? '💵' : '📱'}</div>
               <h2 className="text-2xl font-bold text-black mb-2">Konfirmasi Pembayaran</h2>
+              
+              {isMultiKios && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-yellow-800">
+                    <Store className="inline h-4 w-4 mr-1" />
+                    Pesanan akan dibuat untuk {kiosGroups.length} kios berbeda
+                  </p>
+                </div>
+              )}
+              
               <p className="text-gray-600 mb-6">
                 Apakah kamu yakin akan melakukan pembayaran menggunakan metode <span className="font-bold text-red-600">{paymentMethod === 'cash' ? 'Cash di Kasir' : 'QRIS'}</span>?
               </p>
@@ -390,79 +444,126 @@ export default function CheckoutPage() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
+            <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-lg">
               <ArrowLeft className="h-5 w-5" />
             </button>
             <h1 className="text-xl font-bold text-black">Checkout</h1>
+            {isMultiKios && (
+              <span className="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full font-medium">
+                {kiosGroups.length} Kios
+              </span>
+            )}
           </div>
         </div>
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Cart Items */}
+          {/* Multi-Kios Notice */}
+          {isMultiKios && (
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4">
+              <div className="flex items-start gap-3">
+                <Store className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold text-blue-800">Checkout Multi-Kios</h3>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Kamu memesan dari {kiosGroups.length} kios berbeda. Pesanan akan dibuat terpisah untuk setiap kios, 
+                    dan masing-masing kios akan menerima pendapatan sesuai barang yang terjual.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+          {/* Cart Items - Grouped by Kios */}
           <div className="bg-white border-2 border-black rounded-2xl p-6">
             <h2 className="text-lg font-bold text-red-600 mb-4">Keranjang Belanja</h2>
             
-            <div className="space-y-4">
-              {cart.items.map((item) => (
-                <div key={item.menu.id} className="flex items-center gap-4 pb-4 border-b border-gray-200 last:border-0">
-                  <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                    {item.menu.foto_menu ? (
-                      <img 
-                        src={item.menu.foto_menu} 
-                        alt={item.menu.nama_menu}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
-                    ) : (
-                      <span className="text-2xl">🍽️</span>
+            <div className="space-y-6">
+              {kiosGroups.map((group, groupIndex) => (
+                <div key={group.kantin.id} className={groupIndex > 0 ? 'pt-6 border-t-2 border-gray-200' : ''}>
+                  {/* Kios Header */}
+                  <div className="flex items-center gap-2 mb-4 bg-gray-50 p-3 rounded-lg">
+                    <Store className="h-5 w-5 text-red-600" />
+                    <span className="font-bold text-black">{group.kantin.nama_kantin}</span>
+                    {isMultiKios && (
+                      <span className="ml-auto text-sm font-medium text-gray-600">
+                        Subtotal: {formatPrice(group.subtotal)}
+                      </span>
                     )}
                   </div>
                   
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-black">{item.menu.nama_menu}</h3>
-                    <p className="text-sm text-gray-600">{item.kantin.nama_kantin}</p>
-                    <p className="text-sm font-bold text-black">{formatPrice(item.menu.harga)}</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleQuantityChange(item.menu.id, item.quantity - 1)}
-                      className="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <Minus className="h-4 w-4" />
-                    </button>
-                    <span className="w-8 text-center font-medium">{item.quantity}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleQuantityChange(item.menu.id, item.quantity + 1)}
-                      className="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.menu.id)}
-                      className="p-1 hover:bg-gray-100 rounded text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  {/* Items for this Kios */}
+                  <div className="space-y-4">
+                    {group.items.map((item) => (
+                      <div key={item.menu.id} className="flex items-center gap-4 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+                        <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                          {item.menu.foto_menu ? (
+                            <img 
+                              src={item.menu.foto_menu} 
+                              alt={item.menu.nama_menu}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-2xl">🍽️</span>
+                          )}
+                        </div>
+                        
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-black">{item.menu.nama_menu}</h3>
+                          <p className="text-sm font-bold text-black">{formatPrice(item.menu.harga)}</p>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(item.menu.id, item.quantity - 1)}
+                            className="p-1 hover:bg-gray-100 rounded"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <span className="w-8 text-center font-medium">{item.quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(item.menu.id, item.quantity + 1)}
+                            className="p-1 hover:bg-gray-100 rounded"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeItem(item.menu.id)}
+                            className="p-1 hover:bg-gray-100 rounded text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
             </div>
             
             <div className="mt-6 pt-4 border-t-2 border-black">
+              {isMultiKios && (
+                <div className="space-y-2 mb-4">
+                  {kiosGroups.map(group => (
+                    <div key={group.kantin.id} className="flex justify-between text-sm text-gray-600">
+                      <span>{group.kantin.nama_kantin}</span>
+                      <span>{formatPrice(group.subtotal)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-lg font-bold text-black">Total:</span>
                 <span className="text-xl font-bold text-black">{formatPrice(cart.totalPrice)}</span>
               </div>
             </div>
           </div>
+
 
           {/* Customer Information */}
           <div className="bg-white border-2 border-black rounded-2xl p-6">
@@ -514,11 +615,11 @@ export default function CheckoutPage() {
                   required
                   readOnly={isTableNumberLocked}
                   className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black ${isTableNumberLocked ? 'bg-gray-50 border-gray-200 cursor-not-allowed' : 'border-gray-300'}`}
-                  placeholder="Contoh: A1, B2, etc. (untuk pengiriman pesanan)"
+                  placeholder="Contoh: A1, B2, etc."
                 />
                 {isTableNumberLocked && (
                   <p className="mt-1 text-xs text-gray-500">
-                    Nomor meja mengikuti pilihan Anda sebelumnya. Ubah dari kartu nomor meja di kios.
+                    Nomor meja mengikuti pilihan Anda sebelumnya.
                   </p>
                 )}
               </div>
@@ -558,6 +659,14 @@ export default function CheckoutPage() {
           {/* Payment Method Selection */}
           <div className="bg-white border-2 border-black rounded-2xl p-6">
             <h2 className="text-lg font-bold text-red-600 mb-4">Metode Pembayaran</h2>
+            
+            {isMultiKios && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  💡 Pembayaran QRIS akan masuk ke rekening admin, lalu kios dapat melakukan pencairan sesuai pendapatan masing-masing.
+                </p>
+              </div>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button

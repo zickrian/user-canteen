@@ -67,6 +67,38 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Update kantin balance - tambahkan saldo sesuai total pesanan ini saja
+    const { data: pesananForBalance } = await supabaseAdmin
+      .from('pesanan')
+      .select('kantin_id, total_harga')
+      .eq('id', pesananId)
+      .single()
+
+    if (pesananForBalance) {
+      // Get current balance
+      const { data: kantinData } = await supabaseAdmin
+        .from('kantin')
+        .select('balance')
+        .eq('id', pesananForBalance.kantin_id)
+        .single()
+
+      const currentBalance = kantinData?.balance || 0
+      const newBalance = currentBalance + pesananForBalance.total_harga
+
+      // Update balance
+      const { error: balanceError } = await supabaseAdmin
+        .from('kantin')
+        .update({ 
+          balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', pesananForBalance.kantin_id)
+
+      if (balanceError) {
+        console.error('Error updating kantin balance:', balanceError)
+      }
+    }
+
     // Fetch order details untuk kirim email struk
     const { data: pesananData, error: pesananFetchError } = await supabaseAdmin
       .from('pesanan')

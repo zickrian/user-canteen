@@ -17,6 +17,8 @@ interface CartContextType {
   updateQuantity: (menuId: string, quantity: number) => void
   clearCart: () => void
   getItemCount: () => number
+  getKiosCount: () => number
+  getItemsByKios: () => Map<string, { kantin: Kantin; items: CartItem[]; subtotal: number }>
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -126,13 +128,40 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const getItemCount = () => cart.totalItems
 
+  const getKiosCount = () => {
+    const uniqueKios = new Set(cart.items.map(item => item.kantin.id))
+    return uniqueKios.size
+  }
+
+  const getItemsByKios = () => {
+    const groups = new Map<string, { kantin: Kantin; items: CartItem[]; subtotal: number }>()
+    
+    cart.items.forEach(item => {
+      const kantinId = item.kantin.id
+      if (!groups.has(kantinId)) {
+        groups.set(kantinId, {
+          kantin: item.kantin,
+          items: [],
+          subtotal: 0
+        })
+      }
+      const group = groups.get(kantinId)!
+      group.items.push(item)
+      group.subtotal += item.menu.harga * item.quantity
+    })
+    
+    return groups
+  }
+
   const value: CartContextType = {
     cart,
     addItem,
     removeItem,
     updateQuantity,
     clearCart,
-    getItemCount
+    getItemCount,
+    getKiosCount,
+    getItemsByKios
   }
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
