@@ -3,11 +3,12 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { pesananId?: string } }
+  { params }: { params: Promise<{ pesananId: string }> }
 ) {
   try {
-    // Robustly resolve pesananId from params or URL path
-    let pesananId = params?.pesananId
+    // Await params (Next.js 15+ requirement)
+    const resolvedParams = await params
+    let pesananId: string | undefined = resolvedParams?.pesananId
     if (!pesananId) {
       const path = request.nextUrl?.pathname || ''
       const seg = path.split('/').filter(Boolean)
