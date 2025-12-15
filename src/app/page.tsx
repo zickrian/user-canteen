@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import KantinList from '@/components/KantinList'
 import SearchBar from '@/components/SearchBar'
@@ -10,8 +10,18 @@ import MenuGrid from '@/components/MenuGrid'
 import { supabase } from '@/lib/supabase'
 import type { KantinWithRating, Menu } from '@/lib/supabase'
 
-export default function Home() {
+function SearchParamsGate({ onNeedTable }: { onNeedTable: () => void }) {
   const searchParams = useSearchParams()
+  useEffect(() => {
+    const needsTable = searchParams.get('needTable')
+    if (needsTable === '1') {
+      onNeedTable()
+    }
+  }, [searchParams, onNeedTable])
+  return null
+}
+
+export default function Home() {
   const [kantins, setKantins] = useState<KantinWithRating[]>([])
   const [filteredKantins, setFilteredKantins] = useState<KantinWithRating[]>([])
   const [menus, setMenus] = useState<Menu[]>([])
@@ -41,13 +51,6 @@ export default function Home() {
       setShowTableModal(true)
     }
   }, [])
-
-  useEffect(() => {
-    const needsTable = searchParams.get('needTable')
-    if (needsTable === '1') {
-      setShowTableModal(true)
-    }
-  }, [searchParams])
 
   const fetchData = async () => {
     try {
@@ -126,6 +129,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
+      <Suspense fallback={null}>
+        <SearchParamsGate onNeedTable={() => setShowTableModal(true)} />
+      </Suspense>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Search Bar */}
         <div className="mb-6">
