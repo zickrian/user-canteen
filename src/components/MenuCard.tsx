@@ -80,90 +80,82 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
         )}
       </div>
 
-      {/* Menu Info */}
-      <div className="flex-1 min-w-0 space-y-1.5 sm:space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-sm sm:text-base font-semibold text-black leading-tight line-clamp-1 flex-1">
+      {/* Menu Info + Action */}
+      <div className="flex-1 min-w-0 flex items-stretch justify-between gap-3 sm:gap-4">
+        {/* Text Info */}
+        <div className="flex-1 min-w-0 space-y-1.5 sm:space-y-2">
+          <h3 className="text-sm sm:text-base font-semibold text-black leading-tight line-clamp-1">
             {menu.nama_menu}
           </h3>
-          <span className="text-xs sm:text-sm font-bold text-black whitespace-nowrap shrink-0">
+
+          <span className="block text-sm sm:text-base font-bold text-red-500">
             {formatPrice(menu.harga)}
           </span>
+
+          {menu.deskripsi && (
+            <p className="text-[11px] sm:text-xs text-gray-600 leading-snug line-clamp-2">
+              {menu.deskripsi}
+            </p>
+          )}
+
+          <div className="text-[10px] sm:text-[11px] text-gray-500">
+            {menu.total_sold && menu.total_sold > 0
+              ? `Terjual ${menu.total_sold}`
+              : 'Belum ada penjualan'}
+          </div>
         </div>
 
-        {menu.deskripsi && (
-          <p className="text-[11px] sm:text-xs text-gray-600 leading-snug line-clamp-2">
-            {menu.deskripsi}
-          </p>
-        )}
-
-        <div className="text-[10px] sm:text-[11px] text-gray-500">
-          {menu.total_sold && menu.total_sold > 0
-            ? `Terjual ${menu.total_sold}`
-            : 'Belum ada penjualan'}
-        </div>
-
-        {/* Action Bar */}
-        <div className="pt-1">
+        {/* Action Column */}
+        <div className="flex items-center">
           {currentQuantity === 0 ? (
             <button
               onClick={handleIncrement}
               disabled={!menu.tersedia}
-              className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all duration-150
+              className={`h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-xl text-white text-sm font-semibold transition-all duration-150
                 ${
                   menu.tersedia
-                    ? 'bg-red-500 text-white hover:bg-red-600 active:scale-95'
+                    ? 'bg-red-500 hover:bg-red-600 active:scale-95'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }
               `}
+              aria-label="Tambah ke keranjang"
             >
-              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Tambah</span>
+              <Plus className="h-4 w-4" />
             </button>
           ) : (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                <button
-                  onClick={handleDecrement}
-                  disabled={!menu.tersedia || currentQuantity === 0}
-                  className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center text-white transition-all duration-150
-                    ${
-                      menu.tersedia && currentQuantity > 0
-                        ? 'bg-black hover:bg-gray-800 active:scale-95'
-                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    }
-                  `}
-                  aria-label="Kurangi jumlah"
-                >
-                  <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </button>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={handleDecrement}
+                disabled={!menu.tersedia || currentQuantity === 0}
+                className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center text-white transition-all duration-150
+                  ${
+                    menu.tersedia && currentQuantity > 0
+                      ? 'bg-red-500 hover:bg-red-600 active:scale-95'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }
+                `}
+                aria-label="Kurangi jumlah"
+              >
+                <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </button>
 
-                <span className="text-xs sm:text-sm font-semibold text-black min-w-5 sm:min-w-6 text-center">
-                  {currentQuantity}
-                </span>
-
-                <button
-                  onClick={handleIncrement}
-                  disabled={!menu.tersedia}
-                  className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center text-white transition-all duration-150
-                    ${
-                      menu.tersedia
-                        ? 'bg-black hover:bg-gray-800 active:scale-95'
-                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    }
-                  `}
-                  aria-label="Tambah jumlah"
-                >
-                  <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </button>
-              </div>
+              <span className="text-xs sm:text-sm font-semibold text-black min-w-5 sm:min-w-6 text-center">
+                {currentQuantity}
+              </span>
 
               <button
-                onClick={handleDelete}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all duration-150 bg-red-500 text-white hover:bg-red-600 active:scale-95 flex-1 min-w-0"
+                onClick={handleIncrement}
+                disabled={!menu.tersedia}
+                className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center text-white transition-all duration-150
+                  ${
+                    menu.tersedia
+                      ? 'bg-red-500 hover:bg-red-600 active:scale-95'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }
+                `}
+                aria-label="Tambah jumlah"
               >
-                <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                <span className="hidden sm:inline">Hapus</span>
+                <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </button>
             </div>
           )}
