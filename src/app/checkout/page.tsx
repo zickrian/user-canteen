@@ -348,8 +348,8 @@ export default function CheckoutPage() {
     <div className="min-h-screen bg-white">
       {/* Confirmation Modal */}
       {showConfirmation && (
-        <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border-2 border-black max-w-sm w-full p-8 shadow-2xl">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
             <div className="text-center">
               <div className="text-4xl mb-4">
                 {paymentMethod === 'cash' ? '💵' : '📱'}
