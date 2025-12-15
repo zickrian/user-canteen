@@ -154,8 +154,8 @@ export default function Home() {
       <AIAssistant />
 
       {showTableModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-6 md:items-center md:pb-0">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40 px-4 pb-6 md:items-center md:pb-0">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-black">Nomor Meja</h3>
