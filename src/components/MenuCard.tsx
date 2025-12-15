@@ -63,18 +63,9 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
 
         {/* Category Badge */}
         {menu.kategori_menu && menu.kategori_menu.length > 0 && (
-          <div className="absolute top-1 left-1">
-            <span className="bg-black text-white text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+          <div className="absolute top-1 left-1 z-10">
+            <span className="bg-black/80 text-white text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full font-medium">
               {menu.kategori_menu[0]}
-            </span>
-          </div>
-        )}
-
-        {/* Availability Status */}
-        {!menu.tersedia && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <span className="bg-red-500 text-white px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold shadow">
-              Habis
             </span>
           </div>
         )}
@@ -107,17 +98,15 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
 
         {/* Action Column */}
         <div className="flex items-center">
-          {currentQuantity === 0 ? (
+          {/* Out of stock state: gray pill with "Habis" text */}
+          {!menu.tersedia ? (
+            <div className="px-3 sm:px-4 h-9 sm:h-10 flex items-center justify-center rounded-xl bg-gray-200 text-gray-400 text-xs sm:text-sm font-semibold cursor-not-allowed">
+              Habis
+            </div>
+          ) : currentQuantity === 0 ? (
             <button
               onClick={handleIncrement}
-              disabled={!menu.tersedia}
-              className={`h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-xl text-white text-sm font-semibold transition-all duration-150
-                ${
-                  menu.tersedia
-                    ? 'bg-red-500 hover:bg-red-600 active:scale-95'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }
-              `}
+              className="h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-xl bg-red-500 hover:bg-red-600 active:scale-95 text-white text-sm font-semibold transition-all duration-150"
               aria-label="Tambah ke keranjang"
             >
               <Plus className="h-4 w-4" />
@@ -126,10 +115,10 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 onClick={handleDecrement}
-                disabled={!menu.tersedia || currentQuantity === 0}
+                disabled={currentQuantity === 0}
                 className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center text-white transition-all duration-150
                   ${
-                    menu.tersedia && currentQuantity > 0
+                    currentQuantity > 0
                       ? 'bg-red-500 hover:bg-red-600 active:scale-95'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }
@@ -145,14 +134,7 @@ export default function MenuCard({ menu, kantin }: MenuCardProps) {
 
               <button
                 onClick={handleIncrement}
-                disabled={!menu.tersedia}
-                className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center text-white transition-all duration-150
-                  ${
-                    menu.tersedia
-                      ? 'bg-red-500 hover:bg-red-600 active:scale-95'
-                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  }
-                `}
+                className="h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 active:scale-95 text-white transition-all duration-150"
                 aria-label="Tambah jumlah"
               >
                 <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
