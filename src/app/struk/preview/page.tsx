@@ -1,76 +1,37 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { Printer, ArrowLeft, Mail, CheckCircle, Clock } from 'lucide-react'
-import { Pesanan, DetailPesanan, Kantin } from '@/lib/supabase'
+import { useState } from 'react'
+import { Printer, Mail, CheckCircle, Clock, ArrowLeft } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
-interface PaymentInfo {
-  payment_type?: string
-  status?: string
-  created_at?: string
+// Dummy data untuk preview
+const dummyData = {
+  pesanan: {
+    id: 'preview-123',
+    nomor_antrian: 42,
+    nama_pemesan: 'John Doe',
+    email: 'john@example.com',
+    nomor_meja: '5',
+    tipe_pesanan: 'dine_in',
+    total_harga: 75000,
+    status: 'selesai',
+    catatan: '',
+    created_at: new Date().toISOString(),
+  },
+  detailPesanan: [
+    { id: '1', menu: { nama_menu: 'Nasi Goreng Spesial' }, jumlah: 2, harga_satuan: 25000, subtotal: 50000 },
+    { id: '2', menu: { nama_menu: 'Es Teh Manis' }, jumlah: 2, harga_satuan: 5000, subtotal: 10000 },
+    { id: '3', menu: { nama_menu: 'Kerupuk' }, jumlah: 3, harga_satuan: 5000, subtotal: 15000 },
+  ],
+  kantin: { nama_kantin: 'Kantin Pak Budi' },
+  paymentInfo: { payment_type: 'qris', status: 'settlement' }
 }
 
-export default function StrukPage() {
-  const params = useParams()
+export default function StrukPreviewPage() {
   const router = useRouter()
-  const pesananId = params['pesanan-id'] as string
-
-  const [pesanan, setPesanan] = useState<Pesanan | null>(null)
-  const [detailPesanan, setDetailPesanan] = useState<DetailPesanan[]>([])
-  const [kantin, setKantin] = useState<Kantin | null>(null)
-  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [emailSent, setEmailSent] = useState(false)
-  const [emailLoading, setEmailLoading] = useState(false)
-  const [emailError, setEmailError] = useState<string | null>(null)
-
-  useEffect(() => {
-    async function fetchPesananData() {
-      try {
-        setLoading(true)
-        setError(null)
-
-        const res = await fetch(`/api/orders/receipt/${pesananId}`)
-        const payload = await res.json()
-
-        if (!res.ok) {
-          console.error('Error fetching receipt:', payload)
-          setError(payload.error || 'Pesanan tidak ditemukan')
-          return
-        }
-
-        setPesanan(payload.pesanan as Pesanan)
-        setDetailPesanan((payload.detailPesanan || []) as DetailPesanan[])
-        setKantin(payload.kantin as Kantin)
-        setPaymentInfo((payload.paymentUi || null) as PaymentInfo | null)
-
-      } catch (error) {
-        console.error('Error:', error)
-        setError('Terjadi kesalahan yang tidak terduga')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (pesananId) {
-      fetchPesananData()
-      const interval = setInterval(() => {
-        fetch(`/api/orders/receipt/${pesananId}`)
-          .then((r) => r.json())
-          .then((payload) => {
-            const ui: PaymentInfo | null = payload.paymentUi || null
-            if (ui) setPaymentInfo(ui)
-            if (ui?.status === 'settlement') {
-              clearInterval(interval)
-            }
-          })
-          .catch(() => {})
-      }, 3000)
-      return () => clearInterval(interval)
-    }
-  }, [pesananId])
+  const [paymentStatus, setPaymentStatus] = useState<'settlement' | 'pending'>('settlement')
+  
+  const { pesanan, detailPesanan, kantin, paymentInfo } = dummyData
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -91,82 +52,28 @@ export default function StrukPage() {
     })
   }
 
-  const handlePrint = () => {
-    window.print()
-  }
-
-  const handleSendEmail = async () => {
-    if (!pesanan || !pesanan.email || !detailPesanan.length) {
-      setEmailError('Email tidak tersedia')
-      return
-    }
-
-    setEmailLoading(true)
-    setEmailError(null)
-
-    try {
-      const response = await fetch('/api/email/send-receipt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          pesananId,
-          email: pesanan.email
-        })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setEmailError(data.error || 'Gagal mengirim email')
-        return
-      }
-
-      setEmailSent(true)
-      setTimeout(() => setEmailSent(false), 5000)
-    } catch (error) {
-      console.error('Error sending email:', error)
-      setEmailError('Terjadi kesalahan saat mengirim email')
-    } finally {
-      setEmailLoading(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-pulse text-center">
-          <div className="w-12 h-12 border-4 border-gray-300 border-t-black rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Memuat struk...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error || !pesanan) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-md p-8 text-center max-w-md">
-          <div className="text-5xl mb-4">😞</div>
-          <h1 className="text-xl font-bold text-gray-800 mb-2">
-            {error || 'Struk tidak ditemukan'}
-          </h1>
-          <p className="text-gray-600 mb-6">
-            Struk pesanan tidak tersedia atau telah kadaluarsa
-          </p>
+  return (
+    <div className="min-h-screen bg-gray-100 py-4 px-4">
+      {/* Preview Notice */}
+      <div className="max-w-md mx-auto mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
+        <p className="text-yellow-800 text-sm font-medium">🔍 Mode Preview - Data Dummy</p>
+        <div className="mt-2 flex justify-center gap-2">
           <button
-            onClick={() => router.push('/')}
-            className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition"
+            onClick={() => setPaymentStatus('settlement')}
+            className={`px-3 py-1 text-xs rounded ${paymentStatus === 'settlement' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
           >
-            Kembali ke Beranda
+            Lunas
+          </button>
+          <button
+            onClick={() => setPaymentStatus('pending')}
+            className={`px-3 py-1 text-xs rounded ${paymentStatus === 'pending' ? 'bg-yellow-500 text-white' : 'bg-gray-200'}`}
+          >
+            Pending
           </button>
         </div>
       </div>
-    )
-  }
 
-  return (
-    <div className="min-h-screen bg-gray-100 py-4 px-4">
-      {/* Header Actions - Hidden on Print */}
+      {/* Header Actions */}
       <div className="max-w-md mx-auto mb-4 print:hidden">
         <div className="flex items-center justify-between gap-2">
           <button
@@ -178,15 +85,13 @@ export default function StrukPage() {
           </button>
           <div className="flex gap-2">
             <button
-              onClick={handleSendEmail}
-              disabled={emailSent || emailLoading || !pesanan?.email}
-              className="flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
             >
               <Mail className="h-4 w-4" />
-              {emailLoading ? 'Mengirim...' : emailSent ? 'Terkirim ✓' : 'Email'}
+              Email
             </button>
             <button
-              onClick={handlePrint}
+              onClick={() => window.print()}
               className="flex items-center gap-1 px-3 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 transition"
             >
               <Printer className="h-4 w-4" />
@@ -194,16 +99,6 @@ export default function StrukPage() {
             </button>
           </div>
         </div>
-        {emailError && (
-          <div className="mt-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded">
-            {emailError}
-          </div>
-        )}
-        {emailSent && (
-          <div className="mt-2 text-green-600 text-sm bg-green-50 px-3 py-2 rounded">
-            Email struk berhasil dikirim ke {pesanan.email}
-          </div>
-        )}
       </div>
 
       {/* Receipt */}
@@ -212,7 +107,7 @@ export default function StrukPage() {
           {/* Receipt Header */}
           <div className="text-center py-6 border-b-2 border-dashed border-gray-300">
             <h1 className="text-xl font-bold tracking-wide">E-KANTIN</h1>
-            <p className="text-gray-600 text-xs mt-1">{kantin?.nama_kantin || 'Kantin'}</p>
+            <p className="text-gray-600 text-xs mt-1">{kantin.nama_kantin}</p>
             <p className="text-gray-500 text-xs mt-1">Struk Pemesanan</p>
           </div>
 
@@ -247,10 +142,8 @@ export default function StrukPage() {
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-600">Pembayaran</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs capitalize">
-                  {paymentInfo?.payment_type === 'cash' ? 'Cash' : 'QRIS'}
-                </span>
-                {paymentInfo?.status === 'settlement' ? (
+                <span className="text-xs capitalize">QRIS</span>
+                {paymentStatus === 'settlement' ? (
                   <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
                     <CheckCircle className="h-3 w-3" />
                     Lunas
@@ -276,7 +169,7 @@ export default function StrukPage() {
 
           {/* Items List */}
           <div className="px-4 py-2 border-b border-dashed border-gray-300">
-            {detailPesanan.map((item, index) => (
+            {detailPesanan.map((item) => (
               <div key={item.id} className="flex py-2 text-xs border-b border-gray-100 last:border-0">
                 <div className="flex-1">
                   <p className="font-medium">{item.menu?.nama_menu}</p>
@@ -304,14 +197,6 @@ export default function StrukPage() {
             </div>
           </div>
 
-          {/* Notes */}
-          {pesanan.catatan && !pesanan.catatan.includes('dine_in') && !pesanan.catatan.includes('take_away') && (
-            <div className="px-4 py-3 border-b border-dashed border-gray-300">
-              <p className="text-xs text-gray-600 mb-1">Catatan:</p>
-              <p className="text-xs">{pesanan.catatan}</p>
-            </div>
-          )}
-
           {/* Footer */}
           <div className="text-center py-6 px-4">
             <p className="text-xs text-gray-600 mb-1">Terima kasih atas pesanan Anda!</p>
@@ -324,7 +209,7 @@ export default function StrukPage() {
         </div>
       </div>
 
-      {/* Bottom Actions - Hidden on Print */}
+      {/* Bottom Actions */}
       <div className="max-w-md mx-auto mt-6 print:hidden">
         <div className="flex gap-3">
           <button
@@ -345,14 +230,8 @@ export default function StrukPage() {
       {/* Print Styles */}
       <style jsx global>{`
         @media print {
-          body {
-            background: white !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          .print\\:hidden {
-            display: none !important;
-          }
+          body { background: white !important; }
+          .print\\:hidden { display: none !important; }
         }
       `}</style>
     </div>

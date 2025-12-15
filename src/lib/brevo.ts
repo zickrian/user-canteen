@@ -48,7 +48,12 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     if (!response.ok) {
       const error = await response.text()
-      console.error('Brevo API error:', error)
+      console.error('Brevo API error:', response.status, error)
+      console.error('Request details:', {
+        senderEmail,
+        toEmail: to,
+        subject
+      })
       return false
     }
 
@@ -62,7 +67,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 }
 
 /**
- * Generate receipt email HTML template
+ * Generate receipt email HTML template - Clean receipt style
  */
 export function generateReceiptHTML(data: {
   pesananId: string
@@ -93,255 +98,136 @@ export function generateReceiptHTML(data: {
 
   const createdDate = data.createdAt 
     ? new Date(data.createdAt).toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
         year: 'numeric',
-        month: 'long',
-        day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       })
     : new Date().toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
         year: 'numeric',
-        month: 'long',
-        day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       })
 
   return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          background-color: #f5f5f5;
-          margin: 0;
-          padding: 20px;
-        }
-        .container {
-          max-width: 600px;
-          margin: 0 auto;
-          background-color: white;
-          border-radius: 8px;
-          overflow: hidden;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .header {
-          background-color: #000;
-          color: white;
-          padding: 30px;
-          text-align: center;
-        }
-        .header h1 {
-          margin: 0;
-          font-size: 28px;
-        }
-        .header p {
-          margin: 5px 0 0 0;
-          opacity: 0.8;
-        }
-        .content {
-          padding: 30px;
-        }
-        .section {
-          margin-bottom: 25px;
-        }
-        .section-title {
-          font-weight: bold;
-          font-size: 14px;
-          color: #333;
-          margin-bottom: 10px;
-          text-transform: uppercase;
-          border-bottom: 2px solid #f0f0f0;
-          padding-bottom: 5px;
-        }
-        .info-row {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 8px;
-          font-size: 14px;
-        }
-        .info-label {
-          color: #666;
-        }
-        .info-value {
-          color: #000;
-          font-weight: 500;
-        }
-        .items-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin: 15px 0;
-        }
-        .items-table th {
-          background-color: #f9f9f9;
-          border-bottom: 2px solid #e0e0e0;
-          padding: 10px;
-          text-align: left;
-          font-size: 12px;
-          font-weight: bold;
-          color: #333;
-        }
-        .items-table td {
-          border-bottom: 1px solid #f0f0f0;
-          padding: 10px;
-          font-size: 13px;
-        }
-        .items-table tr:last-child td {
-          border-bottom: none;
-        }
-        .qty-col {
-          text-align: center;
-        }
-        .price-col {
-          text-align: right;
-        }
-        .total-section {
-          background-color: #f9f9f9;
-          padding: 15px;
-          border-radius: 4px;
-          margin-top: 15px;
-        }
-        .total-row {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 8px;
-          font-size: 14px;
-        }
-        .total-row.grand-total {
-          font-size: 18px;
-          font-weight: bold;
-          color: #000;
-          border-top: 2px solid #e0e0e0;
-          padding-top: 10px;
-          margin-top: 10px;
-        }
-        .status-badge {
-          display: inline-block;
-          padding: 6px 12px;
-          border-radius: 4px;
-          font-size: 12px;
-          font-weight: bold;
-          margin-top: 5px;
-        }
-        .status-pending {
-          background-color: #fff3cd;
-          color: #856404;
-        }
-        .status-settlement {
-          background-color: #d4edda;
-          color: #155724;
-        }
-        .footer {
-          background-color: #f5f5f5;
-          padding: 20px;
-          text-align: center;
-          font-size: 12px;
-          color: #666;
-          border-top: 1px solid #e0e0e0;
-        }
-        .footer p {
-          margin: 5px 0;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>📋 Struk Pesanan</h1>
-          <p>${data.kantinName}</p>
-        </div>
-        
-        <div class="content">
-          <!-- Status Section -->
-          <div class="section">
-            <div class="section-title">Status Pembayaran</div>
-            <span class="status-badge ${data.paymentStatus === 'settlement' ? 'status-settlement' : 'status-pending'}">
-              ${data.paymentStatus === 'settlement' ? '✓ Sudah Dibayar' : '⏳ Menunggu Pembayaran'}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f5f5f5; font-family: 'Courier New', Courier, monospace;">
+  <div style="max-width: 400px; margin: 0 auto; background-color: white; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    
+    <!-- Header -->
+    <div style="text-align: center; padding: 24px 20px; border-bottom: 2px dashed #ddd;">
+      <h1 style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px;">E-KANTIN</h1>
+      <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">${data.kantinName}</p>
+      <p style="margin: 4px 0 0 0; font-size: 11px; color: #999;">Struk Pemesanan</p>
+    </div>
+
+    <!-- Order Info -->
+    <div style="padding: 16px 20px; border-bottom: 1px dashed #ddd; font-size: 12px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 3px 0; color: #666;">No. Antrian</td>
+          <td style="padding: 3px 0; text-align: right; font-weight: bold; font-size: 16px;">#${data.nomorAntrian.toString().padStart(3, '0')}</td>
+        </tr>
+        <tr>
+          <td style="padding: 3px 0; color: #666;">Tanggal</td>
+          <td style="padding: 3px 0; text-align: right;">${createdDate}</td>
+        </tr>
+        <tr>
+          <td style="padding: 3px 0; color: #666;">Nama</td>
+          <td style="padding: 3px 0; text-align: right;">${data.namaPemesan}</td>
+        </tr>
+        ${data.nomorMeja ? `<tr>
+          <td style="padding: 3px 0; color: #666;">Meja</td>
+          <td style="padding: 3px 0; text-align: right;">${data.nomorMeja}</td>
+        </tr>` : ''}
+        <tr>
+          <td style="padding: 3px 0; color: #666;">Tipe</td>
+          <td style="padding: 3px 0; text-align: right;">${data.tipePesanan === 'dine_in' ? 'Makan di Tempat' : 'Bawa Pulang'}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Payment Status -->
+    <div style="padding: 12px 20px; border-bottom: 1px dashed #ddd; font-size: 12px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="color: #666;">Pembayaran</td>
+          <td style="text-align: right;">
+            <span style="margin-right: 8px;">${data.paymentMethod === 'cash' ? 'Cash' : 'QRIS'}</span>
+            <span style="display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; ${data.paymentStatus === 'settlement' ? 'background-color: #d4edda; color: #155724;' : 'background-color: #fff3cd; color: #856404;'}">
+              ${data.paymentStatus === 'settlement' ? '✓ Lunas' : '⏳ Pending'}
             </span>
-          </div>
+          </td>
+        </tr>
+      </table>
+    </div>
 
-          <!-- Order Info -->
-          <div class="section">
-            <div class="section-title">Informasi Pesanan</div>
-            <div class="info-row">
-              <span class="info-label">ID Pesanan:</span>
-              <span class="info-value">${data.pesananId.slice(0, 8).toUpperCase()}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Nomor Antrian:</span>
-              <span class="info-value">${data.nomorAntrian}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Nama Pemesan:</span>
-              <span class="info-value">${data.namaPemesan}</span>
-            </div>
-            ${data.nomorMeja ? `<div class="info-row">
-              <span class="info-label">Nomor Meja:</span>
-              <span class="info-value">${data.nomorMeja}</span>
-            </div>` : ''}
-            ${data.tipePesanan ? `<div class="info-row">
-              <span class="info-label">Tipe Pesanan:</span>
-              <span class="info-value">${data.tipePesanan === 'dine_in' ? 'Makan di Tempat' : 'Bawa Pulang'}</span>
-            </div>` : ''}
-            <div class="info-row">
-              <span class="info-label">Metode Pembayaran:</span>
-              <span class="info-value">${data.paymentMethod === 'cash' ? 'Cash' : 'QRIS'}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Tanggal & Waktu:</span>
-              <span class="info-value">${createdDate}</span>
-            </div>
-          </div>
+    <!-- Items Header -->
+    <div style="padding: 10px 20px; background-color: #f9f9f9; border-bottom: 1px solid #eee; font-size: 11px; font-weight: bold; color: #666;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="width: 50%;">Item</td>
+          <td style="width: 15%; text-align: center;">Qty</td>
+          <td style="width: 35%; text-align: right;">Harga</td>
+        </tr>
+      </table>
+    </div>
 
-          <!-- Items -->
-          <div class="section">
-            <div class="section-title">Detail Menu</div>
-            <table class="items-table">
-              <thead>
-                <tr>
-                  <th>Menu</th>
-                  <th class="qty-col">Qty</th>
-                  <th class="price-col">Harga</th>
-                  <th class="price-col">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${data.items.map(item => `
-                  <tr>
-                    <td>${item.nama}</td>
-                    <td class="qty-col">${item.jumlah}</td>
-                    <td class="price-col">${formatPrice(item.hargaSatuan)}</td>
-                    <td class="price-col">${formatPrice(item.subtotal)}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
+    <!-- Items -->
+    <div style="padding: 12px 20px; border-bottom: 2px dashed #ddd; font-size: 12px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        ${data.items.map(item => `
+        <tr>
+          <td style="padding: 6px 0; width: 50%; vertical-align: top;">
+            <div style="font-weight: 500;">${item.nama}</div>
+            <div style="color: #999; font-size: 11px;">@ ${formatPrice(item.hargaSatuan)}</div>
+          </td>
+          <td style="padding: 6px 0; width: 15%; text-align: center; vertical-align: top;">${item.jumlah}</td>
+          <td style="padding: 6px 0; width: 35%; text-align: right; vertical-align: top; font-weight: 500;">${formatPrice(item.subtotal)}</td>
+        </tr>
+        `).join('')}
+      </table>
+    </div>
 
-          <!-- Total -->
-          <div class="total-section">
-            <div class="total-row grand-total">
-              <span>Total Pembayaran:</span>
-              <span>${formatPrice(data.totalHarga)}</span>
-            </div>
-          </div>
+    <!-- Total -->
+    <div style="padding: 16px 20px; border-bottom: 2px dashed #ddd; font-size: 12px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 3px 0; color: #666;">Subtotal</td>
+          <td style="padding: 3px 0; text-align: right;">${formatPrice(data.totalHarga)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 3px 0; color: #666;">Biaya Layanan</td>
+          <td style="padding: 3px 0; text-align: right;">Rp 0</td>
+        </tr>
+        <tr>
+          <td colspan="2" style="padding-top: 10px; border-top: 1px solid #eee;"></td>
+        </tr>
+        <tr>
+          <td style="padding: 3px 0; font-weight: bold; font-size: 14px;">TOTAL</td>
+          <td style="padding: 3px 0; text-align: right; font-weight: bold; font-size: 14px;">${formatPrice(data.totalHarga)}</td>
+        </tr>
+      </table>
+    </div>
 
-          <!-- Footer Message -->
-          <div class="section" style="text-align: center; color: #666; font-size: 13px; margin-top: 30px;">
-            <p>Terima kasih telah memesan di ${data.kantinName}</p>
-            <p>Struk ini adalah bukti pemesanan Anda. Simpan untuk keperluan referensi.</p>
-          </div>
-        </div>
+    <!-- Footer -->
+    <div style="text-align: center; padding: 20px; font-size: 11px; color: #666;">
+      <p style="margin: 0 0 4px 0;">Terima kasih atas pesanan Anda!</p>
+      <p style="margin: 0 0 12px 0; color: #999;">Simpan struk ini sebagai bukti pembayaran</p>
+      <p style="margin: 0; color: #ccc;">================================</p>
+      <p style="margin: 8px 0 0 0; color: #999;">E-Kantin © ${new Date().getFullYear()}</p>
+    </div>
 
-        <div class="footer">
-          <p><strong>E-Kantin</strong></p>
-          <p>Sistem Pemesanan Makanan Online</p>
-          <p>© ${new Date().getFullYear()} E-Kantin. Semua hak dilindungi.</p>
-        </div>
-      </div>
-    </body>
-    </html>
+  </div>
+</body>
+</html>
   `
 }
