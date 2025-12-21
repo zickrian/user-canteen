@@ -290,8 +290,8 @@ export default function KantinDetailPage() {
         {/* Status Badge */}
         <div className="absolute top-4 right-4">
           <span className={`px-4 py-2 rounded-full font-bold ${kantin.buka_tutup
-              ? 'bg-green-500 text-white'
-              : 'bg-red-500 text-white'
+            ? 'bg-green-500 text-white'
+            : 'bg-red-500 text-white'
             }`}>
             {kantin.buka_tutup ? 'BUKA' : 'TUTUP'}
           </span>
@@ -430,8 +430,8 @@ export default function KantinDetailPage() {
               }}
               disabled={!tableNumber}
               className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-150 ${tableNumber
-                  ? 'bg-black text-white hover:bg-gray-900 active:scale-95'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-black text-white hover:bg-gray-900 active:scale-95'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
             >
               <CheckCircle2 className="h-5 w-5" />
@@ -447,7 +447,7 @@ export default function KantinDetailPage() {
         onClose={() => setShowLoginModal(false)}
         onLoginSuccess={() => {
           setShowLoginModal(false)
-          // Proceed to checkout after login
+          // Proceed to checkout after login success
           setTimeout(() => {
             handleCheckoutClick()
           }, 500)
@@ -481,8 +481,8 @@ function CategoryNav({
               key={cat}
               onClick={() => onSelect(cat)}
               className={`px-3 pb-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${isActive
-                  ? 'border-red-600 text-red-600'
-                  : 'border-transparent text-gray-600 hover:text-red-600'
+                ? 'border-red-600 text-red-600'
+                : 'border-transparent text-gray-600 hover:text-red-600'
                 }`}
             >
               {label}
