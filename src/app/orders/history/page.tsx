@@ -2,30 +2,26 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Package, Clock, CheckCircle, XCircle, Receipt } from 'lucide-react'
+import { ArrowLeft, Package, Clock, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
-import type { Pesanan } from '@/lib/supabase'
 
-interface OrderWithDetails extends Pesanan {
+interface OrderWithDetails {
+  id: string
   kantin?: {
     id: string
     nama_kantin: string
   }
-  detail_pesanan?: Array<{
-    id: string
-    menu_id: string
-    jumlah: number
-    harga_satuan: number
-    subtotal: number
-    menu?: {
-      id: string
-      nama_menu: string
-      foto_menu: string | null
-    }
-  }>
-  paymentStatus?: string
-  paymentMethod?: string
+  nomor_antrian: number
+  nama_pemesan: string
+  email: string | null
+  nomor_meja: string | null
+  tipe_pesanan: string | null
+  catatan: string | null
+  total_harga: number
+  status: string
+  payment_method: string | null
+  created_at: string
 }
 
 export default function OrderHistoryPage() {
@@ -105,19 +101,27 @@ export default function OrderHistoryPage() {
     }
   }
 
-  const getPaymentStatusBadge = (paymentStatus?: string) => {
-    if (paymentStatus === 'paid') {
-      return (
-        <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full">
-          Lunas
-        </span>
-      )
+  const getPaymentMethodText = (paymentMethod?: string | null) => {
+    switch (paymentMethod) {
+      case 'midtrans':
+      case 'qris':
+        return 'QRIS'
+      case 'cash':
+        return 'Cash'
+      default:
+        return 'Belum dipilih'
     }
-    return (
-      <span className="px-2 py-1 text-xs font-semibold text-yellow-700 bg-yellow-100 rounded-full">
-        Pending
-      </span>
-    )
+  }
+
+  const getTipePesananText = (tipePesanan?: string | null) => {
+    switch (tipePesanan) {
+      case 'dine_in':
+        return 'Makan di Tempat'
+      case 'take_away':
+        return 'Bawa Pulang'
+      default:
+        return '-'
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -193,14 +197,11 @@ export default function OrderHistoryPage() {
               >
                 {/* Order Header */}
                 <div className="p-4 border-b border-gray-200">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {order.kantin?.nama_kantin || 'Kantin'}
-                        </h3>
-                        {getPaymentStatusBadge(order.paymentStatus)}
-                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                        {order.kantin?.nama_kantin || 'Kantin'}
+                      </h3>
                       <div className="flex items-center gap-4 text-sm text-gray-600">
                         <span>Antrian #{order.nomor_antrian}</span>
                         <span>•</span>
@@ -216,70 +217,50 @@ export default function OrderHistoryPage() {
                   </div>
                 </div>
 
-                {/* Order Items */}
-                {order.detail_pesanan && order.detail_pesanan.length > 0 && (
-                  <div className="p-4 border-b border-gray-200">
-                    <div className="space-y-2">
-                      {order.detail_pesanan.map((detail) => (
-                        <div
-                          key={detail.id}
-                          className="flex items-center gap-3"
-                        >
-                          {detail.menu?.foto_menu && (
-                            <img
-                              src={detail.menu.foto_menu}
-                              alt={detail.menu.nama_menu}
-                              className="h-12 w-12 rounded-lg object-cover"
-                            />
-                          )}
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">
-                              {detail.menu?.nama_menu || 'Menu'}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {detail.jumlah}x {formatCurrency(detail.harga_satuan)}
-                            </p>
-                          </div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {formatCurrency(detail.subtotal)}
-                          </p>
-                        </div>
-                      ))}
+                {/* Order Details */}
+                <div className="p-4 space-y-2 border-b border-gray-200">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Nama Pemesan:</span>
+                      <p className="font-medium text-gray-900">{order.nama_pemesan}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Email:</span>
+                      <p className="font-medium text-gray-900">{order.email || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Nomor Meja:</span>
+                      <p className="font-medium text-gray-900">{order.nomor_meja || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Tipe Pesanan:</span>
+                      <p className="font-medium text-gray-900">{getTipePesananText(order.tipe_pesanan)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Metode Pembayaran:</span>
+                      <p className="font-medium text-gray-900">{getPaymentMethodText(order.payment_method)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Status:</span>
+                      <p className="font-medium text-gray-900">{getStatusText(order.status)}</p>
                     </div>
                   </div>
-                )}
+                  {order.catatan && (
+                    <div className="pt-2 border-t border-gray-200">
+                      <span className="text-sm text-gray-500">Catatan:</span>
+                      <p className="text-sm font-medium text-gray-900 mt-1">{order.catatan}</p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Order Footer */}
-                <div className="p-4 bg-gray-50 flex items-center justify-between">
-                  <div>
-                    {order.catatan && (
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Catatan:</span> {order.catatan}
-                      </p>
-                    )}
-                    {order.nomor_meja && (
-                      <p className="text-sm text-gray-600 mt-1">
-                        <span className="font-medium">Meja:</span> {order.nomor_meja}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600">Total</p>
+                <div className="p-4 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Total Harga</span>
                     <p className="text-lg font-bold text-gray-900">
                       {formatCurrency(order.total_harga)}
                     </p>
                   </div>
-                </div>
-
-                {/* Receipt Button */}
-                <div className="p-4 border-t border-gray-200">
-                  <button
-                    onClick={() => router.push(`/struk/${order.id}`)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <Receipt className="h-4 w-4" />
-                    Lihat Struk
-                  </button>
                 </div>
               </div>
             ))}

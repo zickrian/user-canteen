@@ -16,7 +16,7 @@
     "@supabase/supabase-js": "^2.76.1",
     "lucide-react": "^0.548.0",
     "midtrans-client": "^1.4.3",
-    "next": "^16.0.10",
+    "next": "^16.1.0",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
@@ -30,7 +30,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "baseline-browser-mapping": "^2.9.7",
     "eslint": "^9",
-    "eslint-config-next": "^16.0.10",
+    "eslint-config-next": "^16.1.0",
     "fast-check": "^4.4.0",
     "tailwindcss": "^4",
     "typescript": "^5",
