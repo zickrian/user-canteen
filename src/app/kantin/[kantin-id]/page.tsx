@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Star, Clock, ArrowLeft, Store, UtensilsCrossed, XCircle, CheckCircle2, X, Pencil, ShoppingCart } from 'lucide-react'
+import { Star, Clock, ArrowLeft, Store, UtensilsCrossed, XCircle, CheckCircle2, X, Pencil, ShoppingCart, Search } from 'lucide-react'
 import { Kantin, Menu } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import AIAssistant from '@/components/AIAssistant'
@@ -28,6 +28,7 @@ export default function KantinDetailPage() {
   const [showTableModal, setShowTableModal] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<string>('semua')
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     async function fetchKantinData() {
@@ -64,10 +65,41 @@ export default function KantinDetailPage() {
           return
         }
 
-        setMenus(menusData || [])
-        setFilteredMenus(menusData || [])
+        // Fetch jumlah penjualan sebenarnya dari API
+        if (menusData && menusData.length > 0) {
+          try {
+            const menuIds = menusData.map((m: Menu) => m.id)
+            const salesResponse = await fetch('/api/menu/sales-count', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ menuIds })
+            })
 
-        // Optional: rating RPC can be disabled to avoid 404 in environments without the function
+            if (salesResponse.ok) {
+              const { salesCounts } = await salesResponse.json()
+              // Update menu dengan jumlah penjualan sebenarnya
+              const updatedMenus = menusData.map((menu: Menu) => ({
+                ...menu,
+                total_sold: salesCounts[menu.id] || 0
+              }))
+              setMenus(updatedMenus)
+              setFilteredMenus(updatedMenus)
+            } else {
+              // Jika API error, gunakan data dari database
+              setMenus(menusData || [])
+              setFilteredMenus(menusData || [])
+            }
+          } catch (salesError) {
+            console.error('Error fetching sales count:', salesError)
+            // Jika error, gunakan data dari database
+            setMenus(menusData || [])
+            setFilteredMenus(menusData || [])
+          }
+        } else {
+          setMenus(menusData || [])
+          setFilteredMenus(menusData || [])
+        }
+
         if (process.env.NEXT_PUBLIC_ENABLE_RATING === 'true') {
           try {
             const { data: ratingData } = await supabase
@@ -100,7 +132,7 @@ export default function KantinDetailPage() {
 
   useEffect(() => {
     filterMenus()
-  }, [menus, selectedCategory])
+  }, [menus, selectedCategory, searchQuery])
 
   useEffect(() => {
     if (!kantinId) return
@@ -119,7 +151,6 @@ export default function KantinDetailPage() {
 
     if (initialTable) {
       setTableNumber(initialTable)
-      // keep both keys populated so nomor meja terbagi ke semua kios
       sessionStorage.setItem(globalKey, initialTable)
       sessionStorage.setItem(kantinKey, initialTable)
     }
@@ -128,26 +159,26 @@ export default function KantinDetailPage() {
   const filterMenus = () => {
     let filtered = menus
 
-    filtered = filtered.filter(menu =>
-      selectedCategory === 'semua'
-        ? true
-        : menu.kategori_menu?.some(cat => cat?.toLowerCase() === selectedCategory.toLowerCase())
-    )
+    // Filter by Category
+    if (selectedCategory !== 'semua') {
+      filtered = filtered.filter(menu =>
+        menu.kategori_menu?.some(cat => cat?.toLowerCase() === selectedCategory.toLowerCase())
+      )
+    }
+
+    // Filter by Search Query
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase()
+      filtered = filtered.filter(menu =>
+        menu.nama_menu.toLowerCase().includes(lowerQuery) ||
+        menu.deskripsi?.toLowerCase().includes(lowerQuery)
+      )
+    }
 
     setFilteredMenus(filtered)
   }
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price)
-  }
-
   const handleCheckoutClick = () => {
-    // Check if user is authenticated
     if (!isAuthenticated) {
       setShowLoginModal(true)
       return
@@ -163,69 +194,28 @@ export default function KantinDetailPage() {
       return
     }
 
-    if (activeTableNumber) {
-      sessionStorage.setItem('table-number', activeTableNumber)
-      sessionStorage.setItem(`table-number-${kantinId}`, activeTableNumber)
-    }
-
     router.push('/checkout')
   }
 
   const renderStars = (rating: number) => {
-    const stars = []
-    const fullStars = Math.floor(rating)
-    const hasHalfStar = rating % 1 !== 0
-
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(<Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />)
-    }
-
-    if (hasHalfStar) {
-      stars.push(<Star key="half" className="h-4 w-4 fill-yellow-400/50 text-yellow-400" />)
-    }
-
-    const emptyStars = 5 - Math.ceil(rating)
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(<Star key={`empty-${i}`} className="h-4 w-4 text-gray-300" />)
-    }
-
-    return stars
+    return (
+      <div className="flex gap-0.5">
+        <Star className="h-4 w-4 fill-orange-400 text-orange-400" />
+        <span className="font-semibold text-sm ml-1 text-zinc-900">{rating.toFixed(1)}</span>
+      </div>
+    )
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-zinc-50">
         <div className="animate-pulse">
-          {/* Header Full Width */}
-          <div className="w-full h-80 bg-gray-200" />
-
-          {/* Info Section */}
-          <div className="max-w-4xl mx-auto px-4 py-8">
-            <div className="h-8 bg-gray-200 rounded w-1/3 mb-4" />
-            <div className="h-4 bg-gray-200 rounded w-1/2 mb-4" />
-            <div className="h-4 bg-gray-200 rounded w-1/4 mb-8" />
-
-            {/* Search and Filter */}
-            <div className="h-12 bg-gray-200 rounded mb-4" />
-            <div className="flex gap-4 mb-8">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-16 w-20 bg-gray-200 rounded" />
-              ))}
-            </div>
-
-            {/* Menu Cards */}
-            <div className="space-y-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="flex gap-4 p-4 border border-gray-200 rounded-lg">
-                  <div className="w-24 h-24 bg-gray-200 rounded" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-6 bg-gray-200 rounded w-3/4" />
-                    <div className="h-4 bg-gray-200 rounded w-full" />
-                    <div className="h-4 bg-gray-200 rounded w-1/2" />
-                  </div>
-                  <div className="w-10 h-10 bg-gray-200 rounded" />
-                </div>
-              ))}
+          <div className="w-full h-64 bg-zinc-200" />
+          <div className="max-w-3xl mx-auto -mt-12 px-4 relative z-10">
+            <div className="bg-white rounded-3xl p-6 h-40 shadow-sm" />
+            <div className="h-12 w-full bg-zinc-200 rounded-xl mt-6" />
+            <div className="grid gap-4 mt-6">
+              {[1, 2, 3].map(i => <div key={i} className="h-28 bg-white rounded-2xl" />)}
             </div>
           </div>
         </div>
@@ -235,153 +225,170 @@ export default function KantinDetailPage() {
 
   if (error || !kantin) {
     return (
-      <div className="min-h-screen bg-white">
-        <div className="max-w-4xl mx-auto px-4 py-16">
-          <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <XCircle className="h-12 w-12 text-red-500" />
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="flex justify-center">
+            <div className="bg-red-50 p-4 rounded-full">
+              <Store className="h-10 w-10 text-red-500" />
             </div>
-            <h1 className="text-2xl font-bold text-black">
-              {error || 'Kantin tidak ditemukan'}
-            </h1>
-            <p className="text-gray-600">
-              Kantin yang Anda cari tidak tersedia atau sudah tidak aktif
-            </p>
-            <button
-              onClick={() => router.push('/')}
-              className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              Kembali ke Beranda
-            </button>
           </div>
+          <h1 className="text-xl font-bold text-zinc-900">
+            {error || 'Kantin tidak ditemukan'}
+          </h1>
+          <p className="text-zinc-500 text-sm">
+            Maaf, kantin yang Anda cari sedang tidak tersedia saat ini.
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="w-full bg-zinc-900 text-white px-6 py-3 rounded-xl hover:bg-zinc-800 transition-colors font-medium"
+          >
+            Kembali ke Beranda
+          </button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header Section - Full Width */}
-      <div className="relative w-full h-72 bg-gray-100">
+    <div className="min-h-screen bg-zinc-50 pb-20 sm:pb-24">
+      {/* Hero Section */}
+      <div className="relative w-full h-64 sm:h-72 md:h-80 bg-zinc-900">
         {kantin.foto_profil ? (
           <Image
             src={kantin.foto_profil}
             alt={kantin.nama_kantin}
             fill
-            className="object-cover"
+            className="object-cover opacity-90"
             sizes="100vw"
             quality={95}
             priority
           />
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <Store className="h-32 w-32 text-gray-300" />
+          <div className="absolute inset-0 flex items-center justify-center bg-zinc-800">
+            <Store className="h-24 w-24 text-zinc-700" />
           </div>
         )}
 
-        {/* Back Button */}
-        <button
-          onClick={() => router.back()}
-          className="absolute top-4 left-4 p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
+        {/* Gradient Overlay for Text Readability - SUBTLE only at top */}
+        <div className="absolute inset-0 bg-black/20" />
 
-        {/* Status Badge */}
-        <div className="absolute top-4 right-4">
-          <span className={`px-4 py-2 rounded-full font-bold ${kantin.buka_tutup
-            ? 'bg-green-500 text-white'
-            : 'bg-red-500 text-white'
+        {/* Navigation Bar */}
+        <div className="absolute top-0 left-0 right-0 p-3 sm:p-4 flex justify-between items-center z-20">
+          <button
+            onClick={() => router.back()}
+            className="w-9 h-9 sm:w-10 sm:h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-white shadow-sm transition-all"
+          >
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 text-zinc-900" />
+          </button>
+
+          <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-bold tracking-wide shadow-sm backdrop-blur-md ${kantin.buka_tutup
+              ? 'bg-emerald-500/90 text-white'
+              : 'bg-red-500/90 text-white'
             }`}>
-            {kantin.buka_tutup ? 'BUKA' : 'TUTUP'}
+            {kantin.buka_tutup ? 'OPEN' : 'CLOSED'}
           </span>
         </div>
       </div>
 
-      {/* Info Kantin Section */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-6 space-y-3">
-          <h1 className="text-3xl font-bold text-black">{kantin.nama_kantin}</h1>
+      {/* Content Container with Overlap */}
+      <div className="max-w-3xl mx-auto px-3 sm:px-4 -mt-12 sm:-mt-16 md:-mt-20 relative z-10">
 
-          {/* Rating */}
-          {(kantin as any).avg_rating ? (
-            <div className="flex items-center gap-3">
-              <div className="flex items-center">
-                {renderStars((kantin as any).avg_rating)}
+        {/* Info Card */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl shadow-zinc-200/50 ring-1 ring-zinc-100">
+          <div className="flex justify-between items-start gap-3 sm:gap-4">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight truncate">
+                {kantin.nama_kantin}
+              </h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-zinc-500">
+                {kantin.jam_buka && kantin.jam_tutup && (
+                  <div className="flex items-center gap-1.5 bg-zinc-50 px-2 py-1 rounded-lg">
+                    <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <span className="text-[10px] sm:text-xs">{kantin.jam_buka} - {kantin.jam_tutup}</span>
+                  </div>
+                )}
+                {(kantin as any).avg_rating > 0 && (
+                  <div className="flex items-center bg-orange-50 px-2 py-1 rounded-lg">
+                    {renderStars((kantin as any).avg_rating)}
+                    <span className="text-zinc-400 ml-1 text-[10px] sm:text-xs">({(kantin as any).total_ratings})</span>
+                  </div>
+                )}
               </div>
-              <span className="text-sm text-gray-600">
-                {(kantin as any).avg_rating.toFixed(1)} ({(kantin as any).total_ratings} rating)
-              </span>
             </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">Belum memiliki rating</span>
-            </div>
-          )}
+          </div>
 
-          {/* Operating Hours */}
-          {kantin.jam_buka && kantin.jam_tutup && (
-            <div className="flex items-center gap-2 text-gray-700">
-              <Clock className="h-5 w-5" />
-              <span className="text-lg">
-                {kantin.jam_buka} - {kantin.jam_tutup}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Table Number Banner with Cart */}
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex-1 bg-amber-50 border border-amber-100 text-amber-900 rounded-2xl px-4 py-3 font-semibold shadow-sm flex items-center justify-between gap-3">
-            <span className="flex-1 text-center">
-              {tableNumber ? `Nomor Meja: ${tableNumber}` : 'Masukkan nomor meja untuk mulai pesan'}
-            </span>
+          {/* Table & Cart Action Bar */}
+          <div className="mt-4 sm:mt-6 flex items-center gap-2 sm:gap-3 border-t border-zinc-100 pt-4 sm:pt-5">
             <button
               onClick={() => setShowTableModal(true)}
-              className="p-2 rounded-full hover:bg-amber-100 text-amber-900 transition"
-              aria-label="Edit nomor meja"
+              className="flex-1 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl transition-colors text-left group min-w-0"
             >
-              <Pencil className="h-5 w-5" />
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white border border-zinc-200 flex items-center justify-center shrink-0 group-hover:border-orange-200 group-hover:bg-orange-50 transition-colors">
+                <span className="font-bold text-base sm:text-lg text-zinc-900 group-hover:text-orange-600">
+                  {tableNumber || '?'}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] sm:text-xs text-zinc-500 font-medium uppercase tracking-wider">No. Meja</p>
+                <p className="text-xs sm:text-sm font-semibold text-zinc-900 truncate">
+                  {tableNumber ? 'Edit Meja' : 'Pilih Meja'}
+                </p>
+              </div>
+              <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-zinc-400 shrink-0" />
+            </button>
+
+            <button
+              onClick={handleCheckoutClick}
+              className="relative px-4 sm:px-5 py-2.5 sm:py-3 h-[60px] sm:h-[68px] bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-all active:scale-95 flex flex-col items-center justify-center min-w-[70px] sm:min-w-[80px] shrink-0"
+            >
+              <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
+              {itemCount > 0 && (
+                <span className="absolute top-1.5 sm:top-2 right-2 sm:right-3 h-2.5 w-2.5 sm:h-3 sm:w-3 bg-orange-500 rounded-full border-2 border-zinc-900" />
+              )}
+              <span className="text-[9px] sm:text-[10px] font-medium mt-0.5 sm:mt-1">Order</span>
             </button>
           </div>
-          <button
-            type="button"
-            onClick={handleCheckoutClick}
-            className="relative p-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-            aria-label="Keranjang belanja"
-          >
-            <ShoppingCart className="h-6 w-6" />
-            {itemCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
-                {itemCount > 99 ? '99+' : itemCount}
-              </span>
-            )}
-          </button>
         </div>
 
-        {/* Category Nav */}
-        <CategoryNav
-          menus={menus}
-          selectedCategory={selectedCategory}
-          onSelect={setSelectedCategory}
-          onOpenModal={() => setShowTableModal(true)}
-        />
+        {/* Search & Categories */}
+        <div className="mt-6 sm:mt-8 space-y-3 sm:space-y-4">
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-zinc-400" />
+            <input
+              type="text"
+              placeholder="Cari menu favoritmu..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white border-none py-3 sm:py-3.5 pl-10 sm:pl-12 pr-3 sm:pr-4 rounded-xl shadow-sm ring-1 ring-zinc-200 focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all placeholder:text-zinc-400 text-zinc-900 text-sm sm:text-base"
+            />
+          </div>
 
-        {/* Menu List Section */}
-        <div className="mt-6">
+          {/* Category Pills */}
+          <CategoryNav
+            menus={menus}
+            selectedCategory={selectedCategory}
+            onSelect={setSelectedCategory}
+          />
+        </div>
+
+        {/* Menu Grid */}
+        <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4 pb-8 sm:pb-12">
+          <h2 className="text-base sm:text-lg font-bold text-zinc-900 px-1">
+            {selectedCategory === 'semua' ? 'Semua Menu' : selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
+          </h2>
+
           {filteredMenus.length === 0 ? (
-            <div className="text-center py-16 space-y-3">
-              <div className="flex justify-center">
-                <UtensilsCrossed className="h-12 w-12 text-gray-400" />
+            <div className="text-center py-12 sm:py-20 bg-white rounded-xl sm:rounded-2xl border border-dashed border-zinc-200">
+              <div className="flex justify-center mb-3">
+                <UtensilsCrossed className="h-8 w-8 sm:h-10 sm:w-10 text-zinc-300" />
               </div>
-              <p className="text-gray-700 text-lg font-medium">
-                {selectedCategory !== 'semua'
-                  ? 'Tidak ada menu di kategori ini'
-                  : 'Belum ada menu tersedia'}
+              <p className="text-sm sm:text-base text-zinc-500 font-medium">
+                {searchQuery ? 'Menu tidak ditemukan' : 'Belum ada menu di kategori ini'}
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4">
               {filteredMenus.map((menu) => (
                 <MenuCard
                   key={menu.id}
@@ -394,33 +401,40 @@ export default function KantinDetailPage() {
         </div>
       </div>
 
-      {/* AI Assistant */}
+      {/* AI Assistant Floating Button */}
       <AIAssistant kantinId={kantinId} kantin={kantin} />
 
-      {/* Table Number Bottom Sheet */}
+      {/* Modals */}
       {showTableModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center px-4">
-          <div className="w-full max-w-md bg-white rounded-t-3xl md:rounded-3xl shadow-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-black">Nomor Meja</h3>
-              <button
-                onClick={() => setShowTableModal(false)}
-                className="p-2 rounded-full hover:bg-gray-100"
-              >
-                <X className="h-5 w-5" />
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 sm:mb-6 gap-2">
+              <h3 className="text-lg sm:text-xl font-bold text-zinc-900">Nomor Meja</h3>
+              <button onClick={() => setShowTableModal(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-colors shrink-0">
+                <X className="h-4 w-4 sm:h-5 sm:w-5 text-zinc-500" />
               </button>
             </div>
-            <p className="text-sm text-gray-600">
-              Masukkan nomor meja Anda untuk mempermudah pesanan.
-            </p>
-            <input
-              type="number"
-              min="1"
-              value={tableNumber}
-              onChange={(e) => setTableNumber(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-black"
-              placeholder="Contoh: 28"
-            />
+
+            <div className="space-y-3 sm:space-y-4">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-3 sm:left-4 flex items-center pointer-events-none">
+                  <span className="text-zinc-400 font-bold">#</span>
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  value={tableNumber}
+                  onChange={(e) => setTableNumber(e.target.value)}
+                  className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-3 sm:py-4 bg-zinc-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-center outline-none transition-all placeholder:text-zinc-300"
+                  placeholder="00"
+                  autoFocus
+                />
+              </div>
+              <p className="text-center text-xs sm:text-sm text-zinc-500">
+                Masukkan nomor meja yang tertera di meja Anda
+              </p>
+            </div>
+
             <button
               onClick={() => {
                 if (!tableNumber) return
@@ -429,30 +443,22 @@ export default function KantinDetailPage() {
                 setShowTableModal(false)
               }}
               disabled={!tableNumber}
-              className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-150 ${tableNumber
-                ? 'bg-black text-white hover:bg-gray-900 active:scale-95'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
+              className="w-full mt-6 sm:mt-8 bg-orange-600 hover:bg-orange-700 disabled:bg-zinc-200 disabled:text-zinc-400 text-white font-bold py-3 sm:py-4 rounded-xl transition-all active:scale-95 shadow-lg shadow-orange-200 text-sm sm:text-base"
             >
-              <CheckCircle2 className="h-5 w-5" />
               Simpan Nomor Meja
             </button>
           </div>
         </div>
       )}
 
-      {/* Login Modal */}
       <LoginModal
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
         onLoginSuccess={() => {
           setShowLoginModal(false)
-          // Proceed to checkout after login success
-          setTimeout(() => {
-            handleCheckoutClick()
-          }, 500)
+          setTimeout(() => handleCheckoutClick(), 500)
         }}
-        message="Sepertinya kamu belum login. Login terlebih dahulu untuk melanjutkan pemesanan."
+        message="Silakan login untuk memesan"
       />
     </div>
   )
@@ -466,30 +472,27 @@ function CategoryNav({
   menus: Menu[]
   selectedCategory: string
   onSelect: (cat: string) => void
-  onOpenModal?: () => void
 }) {
-  const items = ['semua', 'makanan', 'minuman']
+  const categories = ['semua', 'makanan', 'minuman']
 
   return (
-    <div className="overflow-x-auto">
-      <div className="inline-flex items-center gap-3 border-b border-gray-200 pb-3 min-w-full">
-        {items.map(cat => {
-          const isActive = selectedCategory === cat
-          const label = cat === 'semua' ? 'Semua' : cat.charAt(0).toUpperCase() + cat.slice(1)
-          return (
-            <button
-              key={cat}
-              onClick={() => onSelect(cat)}
-              className={`px-3 pb-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${isActive
-                ? 'border-red-600 text-red-600'
-                : 'border-transparent text-gray-600 hover:text-red-600'
-                }`}
-            >
-              {label}
-            </button>
-          )
-        })}
-      </div>
+    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-3 sm:-mx-4 px-3 sm:px-4 md:mx-0 md:px-0">
+      {categories.map(cat => {
+        const isActive = selectedCategory === cat
+        const label = cat === 'semua' ? 'Semua' : cat.charAt(0).toUpperCase() + cat.slice(1)
+        return (
+          <button
+            key={cat}
+            onClick={() => onSelect(cat)}
+            className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-200 border shrink-0 ${isActive
+              ? 'bg-zinc-900 border-zinc-900 text-white shadow-md'
+              : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50'
+              }`}
+          >
+            {label}
+          </button>
+        )
+      })}
     </div>
   )
 }

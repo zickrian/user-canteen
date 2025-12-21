@@ -53,7 +53,36 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
           return
         }
 
-        setMenus(menusData || [])
+        // Fetch jumlah penjualan sebenarnya dari API
+        if (menusData && menusData.length > 0) {
+          try {
+            const menuIds = menusData.map((m: Menu) => m.id)
+            const salesResponse = await fetch('/api/menu/sales-count', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ menuIds })
+            })
+
+            if (salesResponse.ok) {
+              const { salesCounts } = await salesResponse.json()
+              // Update menu dengan jumlah penjualan sebenarnya
+              const updatedMenus = menusData.map((menu: Menu) => ({
+                ...menu,
+                total_sold: salesCounts[menu.id] || 0
+              }))
+              setMenus(updatedMenus)
+            } else {
+              // Jika API error, gunakan data dari database
+              setMenus(menusData || [])
+            }
+          } catch (salesError) {
+            console.error('Error fetching sales count:', salesError)
+            // Jika error, gunakan data dari database
+            setMenus(menusData || [])
+          }
+        } else {
+          setMenus(menusData || [])
+        }
       } catch (error) {
         console.error('Error:', error)
         setError('Terjadi kesalahan yang tidak terduga')
@@ -164,12 +193,12 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
         return (
           <div
             key={kantinId}
-            className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:-translate-y-0.5"
+            className="space-y-3 sm:space-y-4 rounded-xl sm:rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 shadow-sm transition hover:shadow-md hover:-translate-y-0.5"
           >
             {/* Kantin Header */}
-            <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="relative w-14 h-14 rounded-full overflow-hidden bg-gray-100 border border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 pb-3 sm:pb-4 border-b border-gray-200">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
                   {kantin.foto_profil ? (
                     <Image
                       src={kantin.foto_profil}
@@ -180,13 +209,13 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <Store className="h-6 w-6" />
+                      <Store className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
                   )}
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-black">{kantin.nama_kantin}</h3>
-                  <p className="text-sm text-gray-600">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-bold text-black truncate">{kantin.nama_kantin}</h3>
+                  <p className="text-xs sm:text-sm text-gray-600 truncate">
                     {kantin.jam_buka && kantin.jam_tutup 
                       ? `${kantin.jam_buka} - ${kantin.jam_tutup}`
                       : 'Jam operasional tidak tersedia'
@@ -194,13 +223,13 @@ export default function MenuGrid({ searchQuery, selectedCategory }: MenuGridProp
                   </p>
                 </div>
               </div>
-              <div className="ml-auto flex items-center gap-3">
-                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+              <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 sm:ml-auto">
+                <span className="bg-green-100 text-green-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium shrink-0">
                   {menus.length} menu
                 </span>
                 <Link
                   href={`/kantin/${kantin.id}`}
-                  className="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+                  className="inline-flex items-center rounded-lg bg-red-600 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 shrink-0"
                 >
                   Kunjungi Kios
                 </Link>
@@ -244,7 +273,35 @@ export function useMenuData() {
           .in('kantin_id', kantinsData?.map(k => k.id) || [])
 
         setKantins(kantinsData || [])
-        setMenus(menusData || [])
+
+        // Fetch jumlah penjualan sebenarnya dari API
+        if (menusData && menusData.length > 0) {
+          try {
+            const menuIds = menusData.map((m: Menu) => m.id)
+            const salesResponse = await fetch('/api/menu/sales-count', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ menuIds })
+            })
+
+            if (salesResponse.ok) {
+              const { salesCounts } = await salesResponse.json()
+              // Update menu dengan jumlah penjualan sebenarnya
+              const updatedMenus = menusData.map((menu: Menu) => ({
+                ...menu,
+                total_sold: salesCounts[menu.id] || 0
+              }))
+              setMenus(updatedMenus)
+            } else {
+              setMenus(menusData || [])
+            }
+          } catch (salesError) {
+            console.error('Error fetching sales count:', salesError)
+            setMenus(menusData || [])
+          }
+        } else {
+          setMenus(menusData || [])
+        }
       } catch (error) {
         console.error('Error fetching data:', error)
       }

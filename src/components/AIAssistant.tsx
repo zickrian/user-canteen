@@ -96,9 +96,9 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
   // Send quick reply directly
   const sendQuickReply = async (reply: string) => {
     if (isLoading) return
-    
+
     setQuickReplies([]) // Clear quick replies
-    
+
     const userMessage: AIMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -161,9 +161,9 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
         role: msg.role,
         content: msg.content
       }))
-      
+
       console.log('Calling chat API with:', { message: userMessage, kantinId, historyLength: history.length })
-      
+
       // Gunakan /api/chat untuk semua request (support dengan atau tanpa kantinId)
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -176,14 +176,14 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
           history: history.length > 0 ? history : undefined
         })
       });
-      
+
       const data = await response.json();
       console.log('Chat API Response:', data)
-      
+
       if (!response.ok) {
         throw new Error(data.error || `API Error: ${response.status}`);
       }
-      
+
       return {
         message: data.reply || 'Maaf, saya tidak bisa memproses permintaan kamu saat ini.',
         menuData: data.menuData || null,
@@ -193,7 +193,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     } catch (error: any) {
       console.error('Error generating AI response:', error)
       console.error('Error message:', error.message)
-      
+
       // Return pesan error yang user-friendly
       return {
         message: `Maaf, saya sedang mengalami masalah teknis. Silakan coba lagi beberapa saat ya! 😅`,
@@ -269,7 +269,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
   const handleAddToCart = (menu: Menu, menuKantin?: Kantin) => {
     // Gunakan kantin dari parameter (untuk menu global) atau kantin dari props
     const targetKantin = menuKantin || kantin
-    
+
     if (targetKantin) {
       addItem(menu, targetKantin)
 
@@ -295,7 +295,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
   const handleAddComboToCart = (combo: ComboPackage) => {
     const makananKantin = (combo.makanan as any).kantin || kantin
     const minumanKantin = (combo.minuman as any).kantin || kantin
-    
+
     if (makananKantin && minumanKantin) {
       addItem(combo.makanan, makananKantin)
       addItem(combo.minuman, minumanKantin)
@@ -332,63 +332,71 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       {comboSuggestions.map((combo, index) => (
         <div
           key={combo.id}
-          className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-200 rounded-lg p-3 hover:border-orange-400 transition-colors"
+          className="bg-white border-2 border-orange-100 rounded-xl p-3 hover:border-orange-300 transition-colors shadow-sm"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-full uppercase tracking-wider">
               🍱 Paket {index + 1}
             </span>
-            <span className="text-xs text-gray-500">
+            <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
               Hemat Rp {combo.sisa.toLocaleString('id-ID')}
             </span>
           </div>
-          
+
           <div className="space-y-2">
             {/* Makanan */}
-            <div className="flex items-center gap-2 bg-white rounded p-2">
-              <div className="w-10 h-10 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+            <div className="flex items-center gap-3 bg-zinc-50 rounded-lg p-2">
+              <div className="w-10 h-10 bg-white rounded-md overflow-hidden flex-shrink-0 border border-zinc-100">
                 {combo.makanan.foto_menu ? (
-                  <img src={combo.makanan.foto_menu} alt={combo.makanan.nama_menu} className="w-full h-full object-cover" />
+                  <img
+                    src={combo.makanan.foto_menu}
+                    alt={combo.makanan.nama_menu}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-lg">🍚</div>
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-black truncate">{combo.makanan.nama_menu}</p>
-                <p className="text-xs text-gray-500">{formatPrice(combo.makanan.harga)}</p>
+                <p className="text-sm font-semibold text-zinc-900 truncate">{combo.makanan.nama_menu}</p>
+                <p className="text-xs text-orange-600 font-medium">{formatPrice(combo.makanan.harga)}</p>
               </div>
             </div>
-            
+
             {/* Plus sign */}
-            <div className="text-center text-gray-400 text-sm">+</div>
-            
+            <div className="text-center text-zinc-300 text-xs py-1">+</div>
+
             {/* Minuman */}
-            <div className="flex items-center gap-2 bg-white rounded p-2">
-              <div className="w-10 h-10 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+            <div className="flex items-center gap-3 bg-zinc-50 rounded-lg p-2">
+              <div className="w-10 h-10 bg-white rounded-md overflow-hidden flex-shrink-0 border border-zinc-100">
                 {combo.minuman.foto_menu ? (
-                  <img src={combo.minuman.foto_menu} alt={combo.minuman.nama_menu} className="w-full h-full object-cover" />
+                  <img
+                    src={combo.minuman.foto_menu}
+                    alt={combo.minuman.nama_menu}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-lg">🥤</div>
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-black truncate">{combo.minuman.nama_menu}</p>
-                <p className="text-xs text-gray-500">{formatPrice(combo.minuman.harga)}</p>
+                <p className="text-sm font-semibold text-zinc-900 truncate">{combo.minuman.nama_menu}</p>
+                <p className="text-xs text-orange-600 font-medium">{formatPrice(combo.minuman.harga)}</p>
               </div>
             </div>
           </div>
-          
+
           {/* Total & Button */}
-          <div className="flex items-center justify-between mt-3 pt-2 border-t border-orange-200">
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-dashed border-zinc-200">
             <div>
-              <p className="text-xs text-gray-500">Total Paket</p>
-              <p className="text-sm font-bold text-black">{formatPrice(combo.total)}</p>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Total Paket</p>
+              <p className="text-sm font-bold text-zinc-900">{formatPrice(combo.total)}</p>
             </div>
             <button
               onClick={() => handleAddComboToCart(combo)}
-              className="bg-orange-500 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-orange-600 transition-colors"
+              className="bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-zinc-800 transition-colors shadow-sm"
             >
-              + Tambah Paket
+              + Ambil Paket
             </button>
           </div>
         </div>
@@ -401,80 +409,66 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       {menuSuggestions.map((menu) => {
         const kantinInfo = (menu as any).kantin;
         const isGlobalMenu = !kantin && kantinInfo;
-        
+
         return (
           <div
             key={menu.id}
-            className="bg-white border-2 border-gray-200 rounded-lg p-3 hover:border-black transition-colors"
+            className="bg-white border border-zinc-100 shadow-sm rounded-xl p-3 hover:border-orange-200 transition-colors group"
           >
             <div className="flex items-start gap-3">
               {/* Menu Image */}
-              <div className="w-14 h-14 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
+              <div className="w-14 h-14 bg-zinc-50 rounded-lg flex-shrink-0 overflow-hidden border border-zinc-100">
                 {menu.foto_menu ? (
-                  <img 
-                    src={menu.foto_menu} 
+                  <img
+                    src={menu.foto_menu}
                     alt={menu.nama_menu}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
                 )}
               </div>
-              
+
               <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-sm text-black flex items-center gap-2 flex-wrap">
+                <h4 className="font-semibold text-sm text-zinc-900 flex items-center gap-2 flex-wrap">
                   <span className="truncate">{menu.nama_menu}</span>
                   {(menu.total_sold && menu.total_sold > 10) ? (
-                    <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full whitespace-nowrap">
-                      🔥 Populer
+                    <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded-full whitespace-nowrap border border-orange-100 font-medium">
+                      Popular
                     </span>
                   ) : null}
                 </h4>
-                
+
                 {isGlobalMenu && kantinInfo ? (
                   <p className="text-xs text-blue-600 mt-1 font-medium">
                     🏪 {kantinInfo.nama_kantin}
                   </p>
                 ) : null}
-                
+
                 {menu.deskripsi ? (
-                  <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                  <p className="text-xs text-zinc-500 mt-1 line-clamp-2 leading-relaxed">
                     {menu.deskripsi}
                   </p>
                 ) : null}
-                
+
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <p className="text-sm font-bold text-black">
+                  <p className="text-sm font-bold text-orange-600">
                     {formatPrice(menu.harga)}
                   </p>
-                  {menu.kategori_menu && menu.kategori_menu.length > 0 ? (
-                    <div className="flex gap-1 flex-wrap">
-                      {menu.kategori_menu.slice(0, 2).map((cat) => (
-                        <span
-                          key={`${menu.id}-${cat}`}
-                          className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded"
-                        >
-                          {cat}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
               </div>
               <div className="flex flex-col gap-1 shrink-0">
                 <button
                   onClick={() => {
                     if (isGlobalMenu && kantinInfo) {
-                      // Untuk menu global, gunakan data kantin dari menu
                       handleAddToCart(menu, kantinInfo);
                     } else {
-                      // Untuk menu kantin saat ini
                       handleAddToCart(menu);
                     }
                   }}
-                  className="bg-black text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors whitespace-nowrap"
+                  className="bg-zinc-900 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-zinc-800 transition-colors whitespace-nowrap shadow-sm active:scale-95"
                 >
-                  + Tambah
+                  + Add
                 </button>
               </div>
             </div>
@@ -488,16 +482,16 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 p-2 transition-transform duration-300 hover:scale-105 z-50"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 p-1 transition-transform duration-300 hover:scale-105 z-50 group"
         aria-label="Buka AI Assistant"
       >
-        <div className="relative h-12 w-12">
+        <div className="relative h-12 w-12 sm:h-14 sm:w-14 bg-white rounded-full shadow-xl flex items-center justify-center border-2 border-zinc-100 overflow-hidden group-hover:border-orange-200 transition-colors">
           <Image
             src="/ang.png"
             alt="AI Assistant"
             fill
-            sizes="48px"
-            className="object-contain drop-shadow-lg"
+            sizes="56px"
+            className="object-cover"
             priority={false}
           />
         </div>
@@ -506,64 +500,64 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 max-w-[calc(100vw-2rem)] h-[600px] max-h-[80vh] bg-white rounded-2xl shadow-2xl z-50 flex flex-col border-2 border-black">
+    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-[calc(100vw-2rem)] sm:w-96 max-w-[calc(100vw-2rem)] h-[500px] sm:h-[600px] max-h-[85vh] sm:max-h-[80vh] bg-white rounded-2xl sm:rounded-3xl shadow-2xl shadow-zinc-900/20 z-50 flex flex-col border border-zinc-200 overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
       {/* Header */}
-      <div className="bg-black text-white p-4 rounded-t-2xl flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="relative h-7 w-7">
+      <div className="bg-zinc-900 text-white p-3 sm:p-4 flex items-center justify-between">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="relative h-8 w-8 sm:h-9 sm:w-9 bg-white/10 rounded-full p-1 border border-white/20 overflow-hidden shrink-0">
             <Image
               src="/ang.png"
               alt="AI Assistant"
               fill
-              sizes="28px"
-              className="object-contain"
+              sizes="36px"
+              className="object-cover"
             />
           </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-sm">AI Assistant Kuliner</span>
-            <span className="text-xs text-gray-300">
+          <div className="flex flex-col min-w-0">
+            <span className="font-bold text-xs sm:text-sm tracking-wide truncate">AI Assistant</span>
+            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase tracking-wider font-medium truncate">
               {kantin?.nama_kantin || 'E-Kantin'}
             </span>
           </div>
         </div>
         <button
           onClick={() => setIsOpen(false)}
-          className="p-1 hover:bg-gray-800 rounded transition-colors"
+          className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors shrink-0"
           aria-label="Tutup AI Assistant"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-zinc-400 hover:text-white" />
         </button>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 sm:space-y-6 bg-zinc-50 relative">
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex gap-3 ${
-              message.role === 'user' ? 'justify-end' : 'justify-start'
-            }`}
+            className={`flex gap-2 sm:gap-3 relative z-10 ${message.role === 'user' ? 'justify-end' : 'justify-start'
+              }`}
           >
             {message.role === 'assistant' && (
-              <div className="relative w-10 h-10 shrink-0">
+              <div className="relative w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full bg-white border border-zinc-100 overflow-hidden shadow-sm">
                 <Image
                   src="/ang.png"
                   alt="AI"
                   fill
-                  sizes="40px"
-                  className="object-contain"
+                  sizes="32px"
+                  className="object-cover"
                 />
               </div>
             )}
 
             <div
-              className={`max-w-[80%] ${
-                message.role === 'user'
-                  ? 'bg-black text-white rounded-2xl rounded-tr-sm'
-                  : 'bg-white text-black rounded-2xl rounded-tl-sm border border-gray-200'
-              } p-3 shadow-sm`}
+              className={`max-w-[85%] ${message.role === 'user'
+                ? 'bg-zinc-900 text-white rounded-xl sm:rounded-2xl rounded-tr-sm shadow-md'
+                : 'bg-white text-zinc-900 rounded-xl sm:rounded-2xl rounded-tl-sm border border-zinc-100 shadow-sm'
+                } p-3 sm:p-4`}
             >
-              <p className="text-sm whitespace-pre-line leading-relaxed">
+              <p className="text-xs sm:text-sm whitespace-pre-line leading-relaxed">
                 {message.content}
               </p>
               {message.comboSuggestions &&
@@ -573,40 +567,25 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
                 message.menuSuggestions.length > 0 &&
                 renderMenuSuggestions(message.menuSuggestions)}
             </div>
-
-            {message.role === 'user' && (
-              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center shrink-0">
-                <User className="h-4 w-4 text-gray-600" />
-              </div>
-            )}
           </div>
         ))}
 
         {isLoading && (
-          <div className="flex gap-3 justify-start">
-            <div className="relative w-8 h-8 shrink-0">
+          <div className="flex gap-2 sm:gap-3 justify-start relative z-10">
+            <div className="relative w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full bg-white border border-zinc-100 overflow-hidden shadow-sm">
               <Image
                 src="/ang.png"
                 alt="AI"
                 fill
                 sizes="32px"
-                className="object-contain"
+                className="object-cover"
               />
             </div>
-            <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm p-3 shadow-sm">
-              <div className="flex gap-1">
-                <div
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: '0s' }}
-                />
-                <div
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: '0.1s' }}
-                />
-                <div
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: '0.2s' }}
-                />
+            <div className="bg-white border border-zinc-100 rounded-xl sm:rounded-2xl rounded-tl-sm p-3 sm:p-4 shadow-sm">
+              <div className="flex gap-1.5">
+                <div className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                <div className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                <div className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
               </div>
             </div>
           </div>
@@ -616,13 +595,13 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
 
       {/* Quick Replies */}
       {quickReplies.length > 0 && !isLoading && (
-        <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
-          <div className="flex gap-2 flex-wrap">
+        <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-zinc-100 bg-white shadow-[0_-4px_12px_rgba(0,0,0,0.02)]">
+          <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide pb-1">
             {quickReplies.map((reply, index) => (
               <button
                 key={index}
                 onClick={() => sendQuickReply(reply)}
-                className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-full hover:bg-gray-100 hover:border-gray-400 transition-colors text-gray-700"
+                className="flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-semibold bg-zinc-50 border border-zinc-200 rounded-full hover:bg-zinc-100 hover:border-zinc-300 transition-colors text-zinc-700 active:scale-95"
               >
                 {reply}
               </button>
@@ -632,24 +611,24 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       )}
 
       {/* Input */}
-      <div className="p-4 border-t border-gray-200 bg-white rounded-b-2xl">
+      <div className="p-3 sm:p-4 bg-white border-t border-zinc-100">
         <div className="flex gap-2">
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder="Tanya AI tentang menu... 😊"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
+            placeholder="Ketik pesan..."
+            className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-zinc-50 border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:bg-white transition-all text-xs sm:text-sm placeholder:text-zinc-400 text-zinc-900"
             disabled={isLoading}
           />
           <button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
-            className="bg-black text-white p-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="bg-zinc-900 text-white p-2.5 sm:p-3 rounded-xl hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm shrink-0"
             aria-label="Kirim pesan"
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </button>
         </div>
       </div>

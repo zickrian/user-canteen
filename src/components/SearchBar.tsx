@@ -47,40 +47,42 @@ export default function SearchBar({ value, onChange, showCart = false }: SearchB
 
   return (
     <div className="relative w-full">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
         {/* Search Input */}
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        <div className="relative flex-1 group min-w-0">
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 p-2 sm:p-3 pl-3 sm:pl-5 text-zinc-400 group-focus-within:text-orange-500 transition-colors pointer-events-none">
+            <Search className="h-4 w-4 sm:h-5 sm:w-5" />
+          </div>
           <input
             type="text"
             placeholder="Cari menu atau kantin..."
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full py-3 pl-12 pr-12 text-base border border-gray-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all"
+            className="w-full py-3 sm:py-4 pl-10 sm:pl-14 pr-10 sm:pr-12 text-sm sm:text-base bg-white border border-zinc-200 rounded-xl sm:rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-500 transition-all text-zinc-900 placeholder:text-zinc-400"
           />
           {value && (
             <button
               type="button"
               onClick={() => onChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-300"
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 p-1.5 sm:p-1 rounded-full hover:bg-zinc-100 transition-colors"
               aria-label="Hapus pencarian"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </button>
           )}
         </div>
 
         {/* Shopping Cart Icon - only show if showCart is true */}
         {showCart && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               type="button"
               onClick={handleCheckout}
-              className="relative p-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+              className="relative p-2.5 sm:p-3.5 bg-zinc-900 text-white rounded-xl sm:rounded-2xl hover:bg-zinc-800 transition-all active:scale-95 shadow-md shadow-zinc-200 min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
-              <ShoppingCart className="h-6 w-6" />
+              <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
               {itemCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-orange-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center border-2 border-white">
                   {itemCount > 99 ? '99+' : itemCount}
                 </span>
               )}

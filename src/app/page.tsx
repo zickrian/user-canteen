@@ -9,6 +9,7 @@ import AIAssistant from '@/components/AIAssistant'
 import MenuGrid from '@/components/MenuGrid'
 import { supabase } from '@/lib/supabase'
 import type { KantinWithRating, Menu } from '@/lib/supabase'
+import { X } from 'lucide-react'
 
 function SearchParamsGate({ onNeedTable }: { onNeedTable: () => void }) {
   const searchParams = useSearchParams()
@@ -67,7 +68,7 @@ export default function Home() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      
+
       // Fetch kantins
       const { data: kantinsData, error: kantinsError } = await supabase
         .from('kantin')
@@ -102,7 +103,7 @@ export default function Home() {
       setKantins(kantinsWithRating)
       setMenus(menusData || [])
       setFilteredKantins(kantinsWithRating)
-      
+
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -140,18 +141,18 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-zinc-50 py-4 sm:py-8">
       <Suspense fallback={null}>
         <SearchParamsGate onNeedTable={() => setShowTableModal(true)} />
       </Suspense>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Search Bar */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6 md:mb-8">
           <SearchBar value={searchQuery} onChange={setSearchQuery} showCart={true} />
         </div>
 
         {/* Meal Filter */}
-        <div className="mb-8">
+        <div className="mb-4 sm:mb-6 md:mb-8">
           <MealFilter selected={mealFilter} onSelect={setMealFilter} />
         </div>
 
@@ -166,48 +167,47 @@ export default function Home() {
       <AIAssistant />
 
       {showTableModal && (
-        <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40 px-4 pb-6 md:items-center md:pb-0">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-black">Nomor Meja</h3>
-                <p className="text-sm text-gray-600">Masukkan nomor meja Anda sebelum memesan.</p>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-zinc-900/60 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl ring-1 ring-zinc-100 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="mb-4 sm:mb-6 flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg sm:text-xl font-bold text-zinc-900">Nomor Meja</h3>
+                <p className="text-xs sm:text-sm text-zinc-500 mt-1">Di mana kamu duduk hari ini?</p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowTableModal(false)}
-                className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
+                className="rounded-full p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors shrink-0"
                 aria-label="Tutup"
               >
-                <span className="block text-lg leading-none">X</span>
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <input
-              type="text"
-              value={tableNumber}
-              onChange={(e) => setTableNumber(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-black"
-              placeholder="Contoh: 28"
-            />
+            <div className="space-y-3 sm:space-y-4">
+              <input
+                type="number"
+                value={tableNumber}
+                onChange={(e) => setTableNumber(e.target.value)}
+                className="w-full bg-zinc-50 border-zinc-200 px-3 sm:px-4 py-3 sm:py-4 rounded-xl text-base sm:text-lg font-bold text-center focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder:text-zinc-300 transition-all text-zinc-900"
+                placeholder="00"
+                autoFocus
+              />
 
-            <button
-              type="button"
-              onClick={() => {
-                const trimmed = tableNumber.trim()
-                if (!trimmed) return
-                sessionStorage.setItem('table-number', trimmed)
-                setShowTableModal(false)
-              }}
-              disabled={!tableNumber.trim()}
-              className={`mt-4 w-full rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
-                tableNumber.trim()
-                  ? 'bg-black text-white hover:bg-gray-900 active:scale-95'
-                  : 'cursor-not-allowed bg-gray-200 text-gray-400'
-              }`}
-            >
-              Simpan Nomor Meja
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const trimmed = tableNumber.trim()
+                  if (!trimmed) return
+                  sessionStorage.setItem('table-number', trimmed)
+                  setShowTableModal(false)
+                }}
+                disabled={!tableNumber.trim()}
+                className="w-full bg-zinc-900 disabled:bg-zinc-200 disabled:text-zinc-400 text-white font-bold py-3 sm:py-4 rounded-xl hover:bg-zinc-800 transition-all active:scale-95 shadow-lg shadow-zinc-200 text-sm sm:text-base"
+              >
+                Simpan Nomor Meja
+              </button>
+            </div>
           </div>
         </div>
       )}

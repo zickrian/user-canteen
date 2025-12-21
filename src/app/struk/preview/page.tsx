@@ -54,7 +54,7 @@ function StrukPreviewContent() {
   const [emailSent, setEmailSent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [initialOrders, setInitialOrders] = useState<MultiKiosOrder[]>([])
-  
+
   const { pesanan, detailPesanan, kantin } = dummyData
 
   // Fetch status from database
@@ -74,7 +74,7 @@ function StrukPreviewContent() {
       if (response.ok) {
         const data = await response.json()
         setMultiKiosOrders(data.orders)
-        
+
         // Update overall payment status
         if (data.allPaid) {
           setPaymentStatus('settlement')
@@ -92,13 +92,13 @@ function StrukPreviewContent() {
     const paidParam = searchParams.get('paid')
     const paymentMethodParam = searchParams.get('paymentMethod')
     const emailParam = searchParams.get('email')
-    
+
     if (ordersParam) {
       try {
         const orders = JSON.parse(decodeURIComponent(ordersParam)) as MultiKiosOrder[]
         setInitialOrders(orders)
         setIsMultiKios(true)
-        
+
         // Set payment method
         if (paymentMethodParam === 'qris') {
           setPaymentMethod('qris')
@@ -109,7 +109,7 @@ function StrukPreviewContent() {
             setPaymentStatus('settlement')
           }
         }
-        
+
         // Set customer email
         if (emailParam) {
           setCustomerEmail(decodeURIComponent(emailParam))
@@ -201,7 +201,7 @@ function StrukPreviewContent() {
     }
   }
 
-  const allPaid = multiKiosOrders.length > 0 
+  const allPaid = multiKiosOrders.length > 0
     ? multiKiosOrders.every(o => o.paymentStatus === 'lunas')
     : paymentStatus === 'settlement'
 
@@ -215,97 +215,101 @@ function StrukPreviewContent() {
       status: 'menunggu',
       nomorAntrian: 0
     }))
-    
+
     return (
-      <div className="min-h-screen bg-gray-100 py-4 px-4">
+      <div className="min-h-screen bg-zinc-50 py-3 sm:py-4 px-3 sm:px-4 pb-16 sm:pb-20">
         {/* Header Actions */}
-        <div className="max-w-md mx-auto mb-4 print:hidden">
+        <div className="max-w-md mx-auto mb-4 sm:mb-6 print:hidden">
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={() => router.push('/')}
-              className="flex items-center gap-2 text-gray-600 hover:text-black transition"
+              className="flex items-center gap-1.5 sm:gap-2 text-zinc-600 hover:text-zinc-900 transition bg-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-zinc-100 shadow-sm"
             >
-              <ArrowLeft className="h-5 w-5" />
-              <span>Beranda</span>
+              <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="font-medium text-xs sm:text-sm">Beranda</span>
             </button>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 sm:gap-2">
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white border border-zinc-100 rounded-xl hover:bg-zinc-50 disabled:opacity-50 transition shadow-sm text-zinc-700"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
               {customerEmail && (
                 <button
                   onClick={handleSendEmail}
                   disabled={sendingEmail || emailSent}
-                  className="flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white border border-zinc-100 rounded-xl hover:bg-zinc-50 disabled:opacity-50 transition shadow-sm text-zinc-700 font-medium"
                 >
                   {sendingEmail ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
                   ) : emailSent ? (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
                   ) : (
-                    <Mail className="h-4 w-4" />
+                    <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   )}
-                  {emailSent ? 'Terkirim' : 'Email'}
+                  <span className="hidden sm:inline">{emailSent ? 'Terkirim' : 'Email'}</span>
                 </button>
               )}
               <button
                 onClick={() => window.print()}
-                className="flex items-center gap-1 px-3 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 transition"
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-black text-white rounded-xl hover:bg-zinc-800 transition font-medium shadow-sm"
               >
-                <Printer className="h-4 w-4" />
-                Cetak
+                <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Cetak</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* Success Notice */}
-        <div className={`max-w-md mx-auto mb-4 ${allPaid ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'} border rounded-lg p-4 text-center`}>
+        <div className={`max-w-md mx-auto mb-4 sm:mb-6 ${allPaid ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'} border rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center shadow-sm`}>
           {allPaid ? (
             <>
-              <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
-              <p className="text-green-800 font-bold">Semua Pembayaran Lunas!</p>
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-600" />
+              </div>
+              <p className="text-emerald-800 font-bold text-base sm:text-lg">Semua Pembayaran Lunas!</p>
             </>
           ) : (
             <>
-              <Clock className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
-              <p className="text-yellow-800 font-bold">Menunggu Pembayaran</p>
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-amber-600" />
+              </div>
+              <p className="text-amber-800 font-bold text-base sm:text-lg">Menunggu Pembayaran</p>
             </>
           )}
-          <p className={`${allPaid ? 'text-green-700' : 'text-yellow-700'} text-sm mt-1`}>
+          <p className={`${allPaid ? 'text-emerald-600' : 'text-amber-600'} text-xs sm:text-sm mt-1 font-medium`}>
             {ordersToShow.length} pesanan untuk kios berbeda
           </p>
         </div>
 
         {/* Multi-Kios Receipt */}
         <div className="max-w-md mx-auto">
-          <div className="bg-white shadow-lg rounded-lg overflow-hidden font-mono text-sm">
+          <div className="bg-white shadow-xl shadow-zinc-200/50 rounded-2xl sm:rounded-3xl overflow-hidden font-mono text-xs sm:text-sm border border-zinc-100">
             {/* Receipt Header */}
-            <div className="text-center py-6 border-b-2 border-dashed border-gray-300">
-              <h1 className="text-xl font-bold tracking-wide">E-KANTIN</h1>
-              <p className="text-gray-600 text-xs mt-1">Struk Pesanan Multi-Kios</p>
-              <p className="text-gray-500 text-xs mt-1">{formatDate(new Date().toISOString())}</p>
+            <div className="text-center py-6 sm:py-8 px-4 sm:px-6 border-b-2 border-dashed border-zinc-200">
+              <h1 className="text-xl sm:text-2xl font-black tracking-wider text-zinc-900">E-KANTIN</h1>
+              <p className="text-zinc-500 text-[10px] sm:text-xs mt-1 uppercase tracking-widest font-bold">Struk Pesanan Multi-Kios</p>
+              <p className="text-zinc-400 text-[9px] sm:text-[10px] mt-2 font-medium">{formatDate(new Date().toISOString())}</p>
             </div>
 
             {/* Payment Method Info */}
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <div className="px-6 py-4 bg-zinc-50 border-b border-zinc-200">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600">Metode Pembayaran</span>
-                <span className="font-bold uppercase">{paymentMethod === 'qris' ? 'QRIS' : 'Cash'}</span>
+                <span className="text-zinc-500 font-medium">Metode Pembayaran</span>
+                <span className="font-bold uppercase text-zinc-900">{paymentMethod === 'qris' ? 'QRIS' : 'Cash'}</span>
               </div>
-              <div className="flex items-center justify-between text-xs mt-1">
-                <span className="text-gray-600">Status</span>
+              <div className="flex items-center justify-between text-xs mt-2">
+                <span className="text-zinc-500 font-medium">Status</span>
                 {allPaid ? (
-                  <span className="flex items-center gap-1 text-green-600">
+                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full font-bold uppercase tracking-wide">
                     <CheckCircle className="h-3 w-3" />
                     Semua Lunas
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 text-yellow-600">
+                  <span className="flex items-center gap-1.5 text-[10px] text-amber-700 bg-amber-100 px-2 py-1 rounded-full font-bold uppercase tracking-wide">
                     <Clock className="h-3 w-3" />
                     Menunggu Pembayaran
                   </span>
@@ -314,33 +318,33 @@ function StrukPreviewContent() {
             </div>
 
             {/* Orders by Kios */}
-            <div className="px-4 py-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Store className="h-5 w-5 text-red-600" />
-                <span className="font-bold text-sm">Rincian Pesanan per Kios</span>
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-2 mb-6">
+                <Store className="h-4 w-4 text-orange-600" />
+                <span className="font-bold text-xs uppercase tracking-wider text-zinc-500">Rincian per Kios</span>
               </div>
-              
+
               {ordersToShow.map((order) => (
-                <div key={order.pesananId} className="mb-4 pb-4 border-b border-dashed border-gray-200 last:border-0">
+                <div key={order.pesananId} className="mb-4 pb-4 border-b border-dashed border-zinc-200 last:border-0 last:pb-0 last:mb-0">
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <p className="font-bold text-sm">{order.kantinName}</p>
+                      <p className="font-bold text-sm text-zinc-900">{order.kantinName}</p>
                       {order.nomorAntrian > 0 && (
-                        <p className="text-xs text-gray-500">Antrian #{order.nomorAntrian}</p>
+                        <p className="text-xs text-zinc-500 font-medium mt-0.5">Antrian #<span className="text-zinc-900 font-bold">{order.nomorAntrian}</span></p>
                       )}
                     </div>
-                    <span className="font-bold text-sm">{formatPrice(order.subtotal)}</span>
+                    <span className="font-bold text-sm text-zinc-900">{formatPrice(order.subtotal)}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-xs">
+                  <div className="flex items-center gap-1.5 text-xs">
                     {order.paymentStatus === 'lunas' ? (
                       <>
-                        <CheckCircle className="h-3 w-3 text-green-600" />
-                        <span className="text-green-600">Lunas</span>
+                        <CheckCircle className="h-3 w-3 text-emerald-500" />
+                        <span className="text-emerald-600 font-medium">Lunas</span>
                       </>
                     ) : (
                       <>
-                        <Clock className="h-3 w-3 text-yellow-600" />
-                        <span className="text-yellow-600">
+                        <Clock className="h-3 w-3 text-amber-500" />
+                        <span className="text-amber-600 font-medium">
                           {paymentMethod === 'cash' ? `Bayar di Kasir ${order.kantinName}` : 'Menunggu Pembayaran'}
                         </span>
                       </>
@@ -351,27 +355,33 @@ function StrukPreviewContent() {
             </div>
 
             {/* Total */}
-            <div className="px-4 py-4 bg-gray-50 border-t-2 border-dashed border-gray-300">
-              <div className="flex justify-between font-bold text-base">
+            <div className="px-6 py-6 bg-zinc-50 border-t-2 border-dashed border-zinc-200">
+              <div className="flex justify-between font-bold text-base text-zinc-900">
                 <span>TOTAL SEMUA KIOS</span>
-                <span>{formatPrice(totalAmount)}</span>
+                <span className="text-xl font-black">{formatPrice(totalAmount)}</span>
               </div>
             </div>
 
             {/* Instructions */}
             {allPaid ? (
-              <div className="px-4 py-4 bg-green-50 border-t border-green-200">
-                <p className="text-xs text-green-800 font-bold mb-2">✅ Pembayaran Berhasil!</p>
-                <ol className="text-xs text-green-700 space-y-1 list-decimal list-inside">
+              <div className="px-6 py-6 bg-emerald-50 border-t border-emerald-100">
+                <p className="text-xs text-emerald-800 font-bold mb-3 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  Pembayaran Berhasil!
+                </p>
+                <ol className="text-xs text-emerald-700 space-y-2 list-decimal list-inside font-medium leading-relaxed">
                   <li>Pesanan Anda sedang diproses oleh masing-masing kios</li>
                   <li>Tunjukkan struk ini sebagai bukti pesanan</li>
                   <li>Tunggu pesanan Anda disiapkan dan diantar ke meja</li>
                 </ol>
               </div>
             ) : (
-              <div className="px-4 py-4 bg-yellow-50 border-t border-yellow-200">
-                <p className="text-xs text-yellow-800 font-bold mb-2">📋 Instruksi Pembayaran Cash:</p>
-                <ol className="text-xs text-yellow-700 space-y-1 list-decimal list-inside">
+              <div className="px-6 py-6 bg-amber-50 border-t border-amber-100">
+                <p className="text-xs text-amber-800 font-bold mb-3 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Instruksi Pembayaran Cash:
+                </p>
+                <ol className="text-xs text-amber-700 space-y-2 list-decimal list-inside font-medium leading-relaxed">
                   <li>Kunjungi masing-masing kios untuk pembayaran</li>
                   <li>Tunjukkan struk ini sebagai bukti pesanan</li>
                   <li>Bayar sesuai subtotal di masing-masing kios</li>
@@ -381,29 +391,29 @@ function StrukPreviewContent() {
             )}
 
             {/* Footer */}
-            <div className="text-center py-6 px-4">
-              <p className="text-xs text-gray-600 mb-1">Terima kasih atas pesanan Anda!</p>
-              <p className="text-xs text-gray-500">Simpan struk ini sebagai bukti pesanan</p>
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-xs text-gray-400">================================</p>
-                <p className="text-xs text-gray-500 mt-2">E-Kantin © {new Date().getFullYear()}</p>
+            <div className="text-center py-8 px-6 bg-zinc-50 border-t border-zinc-100">
+              <p className="text-xs text-zinc-600 font-medium mb-1">Terima kasih atas pesanan Anda!</p>
+              <p className="text-[10px] text-zinc-400">Simpan struk ini sebagai bukti pesanan</p>
+              <div className="mt-6">
+                <div className="h-8 w-2/3 bg-zinc-200 mx-auto rounded mb-2 opacity-50"></div>
+                <p className="text-[10px] text-zinc-300 font-mono tracking-widest">MULTIKIOS-{new Date().getTime().toString().slice(-6)}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Bottom Actions */}
-        <div className="max-w-md mx-auto mt-6 print:hidden">
-          <div className="flex gap-3">
+        <div className="max-w-md mx-auto mt-4 sm:mt-8 print:hidden">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <button
               onClick={() => router.push('/')}
-              className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+              className="flex-1 px-4 py-3 sm:py-3.5 border border-zinc-200 text-zinc-700 rounded-xl hover:bg-white hover:shadow-sm transition font-bold text-xs sm:text-sm"
             >
               Beranda
             </button>
             <button
               onClick={() => router.push('/')}
-              className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
+              className="flex-1 px-4 py-3 sm:py-3.5 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition font-bold text-xs sm:text-sm shadow-lg shadow-orange-200"
             >
               Pesan Lagi
             </button>
@@ -423,47 +433,50 @@ function StrukPreviewContent() {
 
   // Regular Preview (dummy data)
   return (
-    <div className="min-h-screen bg-gray-100 py-4 px-4">
+    <div className="min-h-screen bg-zinc-50 py-3 sm:py-4 px-3 sm:px-4 pb-16 sm:pb-20">
       {/* Preview Notice */}
-      <div className="max-w-md mx-auto mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
-        <p className="text-yellow-800 text-sm font-medium">🔍 Mode Preview - Data Dummy</p>
-        <div className="mt-2 flex justify-center gap-2">
+      <div className="max-w-md mx-auto mb-4 sm:mb-6 bg-amber-50 border border-amber-100 rounded-xl sm:rounded-2xl p-3 sm:p-4 text-center">
+        <p className="text-amber-800 text-xs sm:text-sm font-bold flex items-center justify-center gap-2">
+          <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          Mode Preview - Data Dummy
+        </p>
+        <div className="mt-2 sm:mt-3 flex justify-center gap-2">
           <button
             onClick={() => setPaymentStatus('settlement')}
-            className={`px-3 py-1 text-xs rounded ${paymentStatus === 'settlement' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
+            className={`px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs rounded-lg font-bold transition-all ${paymentStatus === 'settlement' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white border border-zinc-200 text-zinc-500'}`}
           >
-            Lunas
+            Set Lunas
           </button>
           <button
             onClick={() => setPaymentStatus('pending')}
-            className={`px-3 py-1 text-xs rounded ${paymentStatus === 'pending' ? 'bg-yellow-500 text-white' : 'bg-gray-200'}`}
+            className={`px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs rounded-lg font-bold transition-all ${paymentStatus === 'pending' ? 'bg-amber-500 text-white shadow-sm' : 'bg-white border border-zinc-200 text-zinc-500'}`}
           >
-            Pending
+            Set Pending
           </button>
         </div>
       </div>
 
       {/* Header Actions */}
-      <div className="max-w-md mx-auto mb-4 print:hidden">
+      <div className="max-w-md mx-auto mb-4 sm:mb-6 print:hidden">
         <div className="flex items-center justify-between gap-2">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-gray-600 hover:text-black transition"
+            className="flex items-center gap-1.5 sm:gap-2 text-zinc-600 hover:text-zinc-900 transition bg-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-zinc-100 shadow-sm"
           >
-            <ArrowLeft className="h-5 w-5" />
-            <span>Kembali</span>
+            <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="font-medium text-xs sm:text-sm">Kembali</span>
           </button>
-          <div className="flex gap-2">
-            <button className="flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition">
-              <Mail className="h-4 w-4" />
-              Email
+          <div className="flex gap-1.5 sm:gap-2">
+            <button className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-white border border-zinc-100 rounded-xl hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm text-zinc-700 font-medium">
+              <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Email</span>
             </button>
             <button
               onClick={() => window.print()}
-              className="flex items-center gap-1 px-3 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 transition"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-black text-white rounded-xl hover:bg-zinc-800 transition font-medium shadow-sm"
             >
-              <Printer className="h-4 w-4" />
-              Cetak
+              <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Cetak</span>
             </button>
           </div>
         </div>
@@ -471,53 +484,62 @@ function StrukPreviewContent() {
 
       {/* Receipt */}
       <div className="max-w-md mx-auto">
-        <div className="bg-white shadow-lg rounded-lg overflow-hidden font-mono text-sm">
+        <div className="bg-white shadow-xl shadow-zinc-200/50 rounded-2xl sm:rounded-3xl overflow-hidden font-mono text-xs sm:text-sm border border-zinc-100 relative">
+
+          {/* Top Jagged Edge */}
+          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-b from-zinc-50/50 to-transparent opacity-50"></div>
+
           {/* Receipt Header */}
-          <div className="text-center py-6 border-b-2 border-dashed border-gray-300">
-            <h1 className="text-xl font-bold tracking-wide">E-KANTIN</h1>
-            <p className="text-gray-600 text-xs mt-1">{kantin.nama_kantin}</p>
-            <p className="text-gray-500 text-xs mt-1">Struk Pemesanan</p>
+          <div className="text-center py-8 px-6 border-b-2 border-dashed border-zinc-200">
+            <h1 className="text-2xl font-black tracking-wider text-zinc-900">E-KANTIN</h1>
+            <p className="text-zinc-500 text-xs mt-1 uppercase tracking-widest font-bold">{kantin.nama_kantin}</p>
+            <p className="text-zinc-400 text-[10px] mt-2 font-medium">STRUK PEMESANAN DUMMY</p>
           </div>
 
           {/* Order Info */}
-          <div className="px-4 py-4 border-b border-dashed border-gray-300">
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-600">No. Antrian</span>
-              <span className="font-bold text-lg">#{pesanan.nomor_antrian.toString().padStart(3, '0')}</span>
+          <div className="px-6 py-6 border-b border-dashed border-zinc-200">
+            <div className="flex justify-between items-end mb-4 bg-zinc-50 p-3 rounded-xl border border-zinc-100">
+              <span className="text-zinc-500 text-xs font-medium uppercase tracking-wide">No. Antrian</span>
+              <span className="font-bold text-2xl text-zinc-900">#{pesanan.nomor_antrian.toString().padStart(3, '0')}</span>
             </div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-600">Tanggal</span>
-              <span>{formatDate(pesanan.created_at)}</span>
-            </div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-600">Nama</span>
-              <span>{pesanan.nama_pemesan}</span>
-            </div>
-            {pesanan.nomor_meja && (
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-gray-600">Meja</span>
-                <span>{pesanan.nomor_meja}</span>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-zinc-500">Tanggal</span>
+                <span className="text-zinc-900 font-medium">{formatDate(pesanan.created_at)}</span>
               </div>
-            )}
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Tipe</span>
-              <span>{pesanan.tipe_pesanan === 'dine_in' ? 'Makan di Tempat' : 'Bawa Pulang'}</span>
+              <div className="flex justify-between text-xs">
+                <span className="text-zinc-500">Nama</span>
+                <span className="text-zinc-900 font-medium">{pesanan.nama_pemesan}</span>
+              </div>
+              {pesanan.nomor_meja && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-zinc-500">Meja</span>
+                  <span className="text-zinc-900 font-medium">{pesanan.nomor_meja}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-xs">
+                <span className="text-zinc-500">Tipe Pesanan</span>
+                <span className="text-zinc-900 font-medium bg-zinc-100 px-2 py-0.5 rounded text-[10px] uppercase tracking-wide">
+                  {pesanan.tipe_pesanan === 'dine_in' ? 'Dine In' : 'Take Away'}
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Payment Status */}
-          <div className="px-4 py-3 border-b border-dashed border-gray-300">
+          <div className="px-6 py-4 border-b border-dashed border-zinc-200 bg-zinc-50/50">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-600">Pembayaran</span>
+              <span className="text-xs text-zinc-500 font-medium">Status Pembayaran</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs capitalize">QRIS</span>
+                <span className="text-xs uppercase font-bold text-zinc-700">QRIS</span>
                 {paymentStatus === 'settlement' ? (
-                  <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
+                  <span className="flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full font-bold uppercase tracking-wide">
                     <CheckCircle className="h-3 w-3" />
                     Lunas
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 text-xs text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded">
+                  <span className="flex items-center gap-1 text-[10px] text-amber-700 bg-amber-100 px-2 py-1 rounded-full font-bold uppercase tracking-wide">
                     <Clock className="h-3 w-3" />
                     Pending
                   </span>
@@ -527,71 +549,53 @@ function StrukPreviewContent() {
           </div>
 
           {/* Items Header */}
-          <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
-            <div className="flex text-xs text-gray-600 font-semibold">
+          <div className="px-6 py-3 bg-zinc-50 border-b border-zinc-200">
+            <div className="flex text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
               <span className="flex-1">Item</span>
-              <span className="w-12 text-center">Qty</span>
-              <span className="w-24 text-right">Harga</span>
+              <span className="w-8 text-center">Qty</span>
+              <span className="w-20 text-right">Harga</span>
             </div>
           </div>
 
           {/* Items List */}
-          <div className="px-4 py-2 border-b border-dashed border-gray-300">
+          <div className="px-6 py-4 border-b border-dashed border-zinc-200">
             {detailPesanan.map((item) => (
-              <div key={item.id} className="flex py-2 text-xs border-b border-gray-100 last:border-0">
-                <div className="flex-1">
-                  <p className="font-medium">{item.menu?.nama_menu}</p>
-                  <p className="text-gray-500">@ {formatPrice(item.harga_satuan)}</p>
+              <div key={item.id} className="flex py-2 text-xs border-b border-zinc-50 last:border-0 items-start">
+                <div className="flex-1 pr-2">
+                  <p className="font-bold text-zinc-900">{item.menu?.nama_menu}</p>
+                  <p className="text-zinc-400 text-[10px]">@ {formatPrice(item.harga_satuan)}</p>
                 </div>
-                <span className="w-12 text-center">{item.jumlah}</span>
-                <span className="w-24 text-right font-medium">{formatPrice(item.subtotal)}</span>
+                <span className="w-8 text-center text-zinc-600 font-medium">{item.jumlah}</span>
+                <span className="w-20 text-right font-medium text-zinc-900">{formatPrice(item.subtotal)}</span>
               </div>
             ))}
           </div>
 
           {/* Totals */}
-          <div className="px-4 py-3 border-b border-dashed border-gray-300">
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-600">Subtotal</span>
-              <span>{formatPrice(pesanan.total_harga)}</span>
-            </div>
+          <div className="px-6 py-6 border-b border-dashed border-zinc-200">
             <div className="flex justify-between text-xs mb-2">
-              <span className="text-gray-600">Biaya Layanan</span>
-              <span>Rp 0</span>
+              <span className="text-zinc-500">Subtotal</span>
+              <span className="text-zinc-900 font-medium">{formatPrice(pesanan.total_harga)}</span>
             </div>
-            <div className="flex justify-between font-bold text-base pt-2 border-t border-gray-200">
-              <span>TOTAL</span>
-              <span>{formatPrice(pesanan.total_harga)}</span>
+            <div className="flex justify-between text-xs mb-4">
+              <span className="text-zinc-500">Biaya Layanan</span>
+              <span className="text-zinc-900 font-medium">Rp 0</span>
+            </div>
+            <div className="flex justify-between items-center pt-4 border-t border-dashed border-zinc-200">
+              <span className="font-bold text-sm text-zinc-900">TwOTAL BAYAR</span>
+              <span className="font-black text-xl text-zinc-900">{formatPrice(pesanan.total_harga)}</span>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="text-center py-6 px-4">
-            <p className="text-xs text-gray-600 mb-1">Terima kasih atas pesanan Anda!</p>
-            <p className="text-xs text-gray-500">Simpan struk ini sebagai bukti pembayaran</p>
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <p className="text-xs text-gray-400">================================</p>
-              <p className="text-xs text-gray-500 mt-2">E-Kantin © {new Date().getFullYear()}</p>
+          <div className="text-center py-8 px-6 bg-zinc-50">
+            <p className="text-xs text-zinc-600 font-medium mb-1">Terima kasih atas kunjungan Anda!</p>
+            <p className="text-[10px] text-zinc-400">Mohon simpan struk ini sebagai bukti pembayaran yang sah.</p>
+            <div className="mt-6">
+              <div className="h-8 w-2/3 bg-zinc-200 mx-auto rounded mb-2 opacity-50"></div>
+              <p className="text-[10px] text-zinc-300 font-mono tracking-widest">{pesanan.id.toUpperCase()}</p>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Bottom Actions */}
-      <div className="max-w-md mx-auto mt-6 print:hidden">
-        <div className="flex gap-3">
-          <button
-            onClick={() => router.push('/')}
-            className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
-          >
-            Beranda
-          </button>
-          <button
-            onClick={() => router.push('/checkout')}
-            className="flex-1 px-4 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition font-medium"
-          >
-            Pesan Lagi
-          </button>
         </div>
       </div>
 
@@ -608,8 +612,8 @@ function StrukPreviewContent() {
 export default function StrukPreviewPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-600">Memuat...</p>
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-zinc-200 border-t-zinc-900 rounded-full animate-spin"></div>
       </div>
     }>
       <StrukPreviewContent />

@@ -11,8 +11,8 @@ interface LoginModalProps {
   message?: string
 }
 
-export default function LoginModal({ 
-  isOpen, 
+export default function LoginModal({
+  isOpen,
   onClose,
   onLoginSuccess,
   message
@@ -56,20 +56,20 @@ export default function LoginModal({
       // Get current origin and pathname
       const currentOrigin = window.location.origin
       const currentPathname = window.location.pathname
-      
+
       // STRICT allowlist - exact match only, no includes() to prevent false positives
       const ALLOWED_ORIGINS = [
         'http://localhost:3000',
         'http://127.0.0.1:3000',
         'https://qmeal.up.railway.app',
       ]
-      
+
       if (!ALLOWED_ORIGINS.includes(currentOrigin)) {
         setError('Login hanya tersedia di aplikasi user, bukan admin')
         setIsLoading(false)
         return
       }
-      
+
       // Save intent to proceed to checkout after login
       if (onLoginSuccess) {
         sessionStorage.setItem('login-intent', 'checkout')
@@ -81,9 +81,9 @@ export default function LoginModal({
       const base = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')
         ? 'http://localhost:3000'
         : 'https://qmeal.up.railway.app'
-      
+
       const redirectTo = `${base}/auth/callback?next=${encodeURIComponent(currentPathname || '/')}`
-      
+
       console.log('[LoginModal] OAuth redirect to:', redirectTo)
       console.log('[LoginModal] Current origin:', currentOrigin)
       console.log('[LoginModal] Current pathname:', currentPathname)
@@ -132,8 +132,8 @@ export default function LoginModal({
   if (!isOpen) return null
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={(e) => {
         // Close modal when clicking backdrop
         if (e.target === e.currentTarget) {
@@ -141,7 +141,7 @@ export default function LoginModal({
         }
       }}
     >
-      <div className="bg-white rounded-2xl max-w-sm w-full shadow-xl">
+      <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
         {/* Header with close button */}
         <div className="flex items-center justify-end p-4 sm:p-5">
           <button
@@ -152,28 +152,28 @@ export default function LoginModal({
               sessionStorage.removeItem('login-origin')
               onClose()
             }}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            className="p-2 hover:bg-zinc-100 rounded-full transition-colors disabled:opacity-50"
             aria-label="Tutup"
           >
-            <X className="h-5 w-5 text-gray-600" />
+            <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="px-6 sm:px-8 pb-6 sm:pb-8">
+        <div className="px-6 sm:px-8 pb-8 sm:pb-10">
           {/* Title */}
-          <h2 className="text-2xl sm:text-3xl font-bold text-black mb-2 text-center">
-            Login diperlukan
+          <h2 className="text-2xl sm:text-3xl font-bold text-zinc-900 mb-2 text-center tracking-tight">
+            Login
           </h2>
 
           {/* Subtitle */}
-          <p className="text-sm sm:text-base text-gray-600 text-center mb-6 sm:mb-8">
+          <p className="text-sm text-zinc-500 text-center mb-8">
             {message || 'Untuk melanjutkan pemesanan'}
           </p>
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm font-medium">
               {error}
             </div>
           )}
@@ -182,19 +182,19 @@ export default function LoginModal({
           <button
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-4 bg-white border-2 border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+            className="w-full relative flex items-center justify-center gap-3 px-4 py-3.5 bg-white border border-zinc-200 rounded-2xl hover:bg-zinc-50 hover:border-zinc-300 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 shadow-sm"
           >
             {isLoading ? (
               <>
-                <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                <span className="text-sm sm:text-base font-medium text-gray-700">
+                <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
+                <span className="text-sm font-medium text-zinc-600">
                   Memproses...
                 </span>
               </>
             ) : (
               <>
-                <svg 
-                  className="w-5 h-5" 
+                <svg
+                  className="w-5 h-5 shrink-0"
                   viewBox="0 0 24 24"
                   aria-hidden="true"
                 >
@@ -215,8 +215,8 @@ export default function LoginModal({
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                   />
                 </svg>
-                <span className="text-sm sm:text-base font-medium text-gray-700">
-                  Continue with Google
+                <span className="text-sm font-semibold text-zinc-700">
+                  Lanjutkan dengan Google
                 </span>
               </>
             )}
