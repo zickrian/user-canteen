@@ -8,11 +8,46 @@ export default function AuthCallbackPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') || '/'
+  const code = searchParams.get('code')
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // Check if there's a hash fragment with tokens (Supabase OAuth redirect)
+        // Handle code parameter (PKCE flow)
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+          
+          if (error) {
+            console.error('[Auth Callback] Exchange code error:', error)
+            router.push(`/?error=${encodeURIComponent(error.message)}`)
+            return
+          }
+
+          if (data?.user) {
+            // Create/update user profile via API
+            try {
+              await fetch('/api/user/profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: data.user.id,
+                  email: data.user.email || '',
+                  full_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || '',
+                  avatar_url: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || '',
+                })
+              })
+            } catch (profileError) {
+              console.error('[Auth Callback] Profile error:', profileError)
+            }
+
+            // Redirect to next path or home
+            const path = next.startsWith('/') ? next : `/${next}`
+            router.push(`${path}?logged_in=true`)
+            return
+          }
+        }
+
+        // Handle hash fragment (implicit flow)
         const hash = window.location.hash
         if (hash) {
           // Supabase client will automatically parse hash fragment tokens
@@ -71,7 +106,7 @@ export default function AuthCallbackPage() {
     }
 
     handleAuthCallback()
-  }, [router, next])
+  }, [router, next, code])
 
   // Show loading state while processing
   return (
