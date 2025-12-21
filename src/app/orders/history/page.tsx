@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { ArrowLeft, Package, Clock, CheckCircle, Receipt, Store, Star } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
@@ -13,6 +14,7 @@ interface OrderWithDetails {
   kantin?: {
     id: string
     nama_kantin: string
+    foto_profil?: string | null
   }
   nomor_antrian: number
   nama_pemesan: string
@@ -295,8 +297,18 @@ export default function OrderHistoryPage() {
                 <div className="p-5 border-b border-zinc-50 bg-zinc-50/50">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white border border-zinc-200 rounded-xl flex items-center justify-center shrink-0">
-                        <Store className="h-5 w-5 text-zinc-400" />
+                      <div className="w-10 h-10 bg-white border border-zinc-200 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+                        {order.kantin?.foto_profil ? (
+                          <Image
+                            src={order.kantin.foto_profil}
+                            alt={order.kantin.nama_kantin || 'Kantin'}
+                            width={40}
+                            height={40}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Store className="h-5 w-5 text-zinc-400" />
+                        )}
                       </div>
                       <div>
                         <h3 className="font-bold text-zinc-900 line-clamp-1">

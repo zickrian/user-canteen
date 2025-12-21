@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     const kantinIds = [...new Set(orders.map((o: any) => o.kantin_id))]
     const { data: kantinList } = await supabase
       .from('kantin')
-      .select('id, nama_kantin')
+      .select('id, nama_kantin, foto_profil')
       .in('id', kantinIds)
 
     const kantinMap = new Map((kantinList || []).map((k: any) => [k.id, k]))

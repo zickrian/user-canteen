@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Send, X, User } from 'lucide-react'
 import { Menu, Kantin } from '@/lib/supabase'
 import { useCart } from '@/contexts/CartContext'
+import { supabase } from '@/lib/supabase'
 
 interface ComboPackage {
   id: string
@@ -156,6 +157,12 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
 
   const generateAIResponse = async (userMessage: string, currentMessages: AIMessage[]) => {
     try {
+      // Get session token for authentication
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('Anda harus login untuk menggunakan fitur AI')
+      }
+
       // Build conversation history from current messages (last 6 messages)
       const history = currentMessages.slice(-6).map(msg => ({
         role: msg.role,
@@ -169,6 +176,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           kantin_id: kantinId || undefined,

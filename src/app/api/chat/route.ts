@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
@@ -635,6 +636,43 @@ function extractMenuSuggestions(response: string, menus: any[]): any[] {
  */
 export async function POST(req: NextRequest) {
   try {
+    // Authentication check - hanya user yang sudah login bisa menggunakan fitur AI
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'Anda harus login untuk menggunakan fitur AI', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      )
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json(
+        { error: 'Supabase configuration missing', code: 'CONFIG_ERROR' },
+        { status: 500 }
+      )
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    })
+
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: 'Anda harus login untuk menggunakan fitur AI', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      )
+    }
+
     let body: any
     try {
       body = await req.json()

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { Star, X, Send } from 'lucide-react'
 import { Kantin, Rating } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
@@ -25,6 +26,49 @@ export default function RatingModal({
   const [komentar, setKomentar] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isLoadingRating, setIsLoadingRating] = useState(false)
+
+  // Load existing rating when modal opens
+  useEffect(() => {
+    if (isOpen && pesananId) {
+      loadExistingRating()
+    } else {
+      // Reset form when modal closes
+      setRating(0)
+      setHoveredRating(0)
+      setKomentar('')
+      setError(null)
+    }
+  }, [isOpen, pesananId])
+
+  const loadExistingRating = async () => {
+    try {
+      setIsLoadingRating(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setIsLoadingRating(false)
+        return
+      }
+
+      const response = await fetch(`/api/rating/kantin?pesanan_id=${pesananId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.rating) {
+          setRating(data.rating.rating || 0)
+          setKomentar(data.rating.komentar || '')
+        }
+      }
+    } catch (err) {
+      console.error('Error loading existing rating:', err)
+    } finally {
+      setIsLoadingRating(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -138,10 +182,20 @@ export default function RatingModal({
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Kantin Info */}
           <div className="text-center">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-black rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
-              <span className="text-white font-bold text-lg sm:text-xl">
-                {kantin.nama_kantin.charAt(0).toUpperCase()}
-              </span>
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-black rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3 overflow-hidden border-2 border-gray-200">
+              {kantin.foto_profil ? (
+                <Image
+                  src={kantin.foto_profil}
+                  alt={kantin.nama_kantin}
+                  width={64}
+                  height={64}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-white font-bold text-lg sm:text-xl">
+                  {kantin.nama_kantin.charAt(0).toUpperCase()}
+                </span>
+              )}
             </div>
             <h3 className="font-semibold text-sm sm:text-base text-black truncate px-2">{kantin.nama_kantin}</h3>
             <p className="text-xs sm:text-sm text-gray-600 mt-1">Bagaimana pengalaman Anda?</p>
