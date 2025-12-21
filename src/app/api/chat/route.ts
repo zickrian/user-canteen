@@ -640,7 +640,7 @@ export async function POST(req: NextRequest) {
     const authHeader = req.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json(
-        { error: 'Anda harus login untuk menggunakan fitur AI', code: 'UNAUTHORIZED' },
+        { error: 'Lakukan login untuk bisa memulai bercakapan dengan chatbot', code: 'UNAUTHORIZED' },
         { status: 401 }
       )
     }
@@ -668,7 +668,7 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
       return NextResponse.json(
-        { error: 'Anda harus login untuk menggunakan fitur AI', code: 'UNAUTHORIZED' },
+        { error: 'Lakukan login untuk bisa memulai bercakapan dengan chatbot', code: 'UNAUTHORIZED' },
         { status: 401 }
       )
     }

@@ -6,6 +6,7 @@ import { Send, X, User } from 'lucide-react'
 import { Menu, Kantin } from '@/lib/supabase'
 import { useCart } from '@/contexts/CartContext'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
 
 interface ComboPackage {
   id: string
@@ -39,6 +40,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
   const [quickReplies, setQuickReplies] = useState<string[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { addItem } = useCart()
+  const { isAuthenticated } = useAuth()
 
   // Generate quick reply suggestions based on context
   const generateQuickReplies = (
@@ -92,6 +94,19 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     scrollToBottom()
   }, [messages])
 
+  // Check authentication when modal opens
+  useEffect(() => {
+    if (isOpen && !isAuthenticated && messages.length === 0) {
+      // Show login message when opening chat without authentication
+      setMessages([{
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'Lakukan login untuk bisa memulai bercakapan dengan chatbot',
+        timestamp: new Date().toISOString(),
+      }])
+    }
+  }, [isOpen, isAuthenticated, messages.length])
+
   // No welcome message - chat starts empty, quick replies appear after first interaction
 
   // Send quick reply directly
@@ -140,12 +155,14 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       }
 
       setMessages((prev) => [...prev, assistantMessage])
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating AI response:', error)
       const errorMessage: AIMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Maaf, saya sedang mengalami masalah teknis. Silakan coba lagi beberapa saat ya! 😅',
+        content: error.message?.includes('login') || error.message === 'UNAUTHORIZED'
+          ? 'Lakukan login untuk bisa memulai bercakapan dengan chatbot'
+          : 'Maaf, saya sedang mengalami masalah teknis. Silakan coba lagi beberapa saat ya! 😅',
         timestamp: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, errorMessage])
@@ -160,7 +177,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       // Get session token for authentication
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        throw new Error('Anda harus login untuk menggunakan fitur AI')
+        throw new Error('UNAUTHORIZED')
       }
 
       // Build conversation history from current messages (last 6 messages)
@@ -189,6 +206,10 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       console.log('Chat API Response:', data)
 
       if (!response.ok) {
+        // Check if it's an authentication error
+        if (response.status === 401 || data.code === 'UNAUTHORIZED') {
+          throw new Error('UNAUTHORIZED')
+        }
         throw new Error(data.error || `API Error: ${response.status}`);
       }
 
@@ -201,6 +222,16 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     } catch (error: any) {
       console.error('Error generating AI response:', error)
       console.error('Error message:', error.message)
+
+      // Check if it's an authentication error
+      if (error.message === 'UNAUTHORIZED' || error.message?.includes('login')) {
+        return {
+          message: 'Lakukan login untuk bisa memulai bercakapan dengan chatbot',
+          menuData: null,
+          comboData: null,
+          toolUsed: null,
+        }
+      }
 
       // Return pesan error yang user-friendly
       return {
@@ -259,13 +290,14 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       }
 
       setMessages((prev) => [...prev, assistantMessage])
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating AI response:', error)
       const errorMessage: AIMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content:
-          'Maaf, saya sedang mengalami masalah teknis. Silakan coba lagi beberapa saat ya! 😅',
+        content: error.message?.includes('login') || error.message === 'UNAUTHORIZED'
+          ? 'Lakukan login untuk bisa memulai bercakapan dengan chatbot'
+          : 'Maaf, saya sedang mengalami masalah teknis. Silakan coba lagi beberapa saat ya! 😅',
         timestamp: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, errorMessage])
@@ -486,10 +518,14 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     </div>
   )
 
+  const handleOpenChat = () => {
+    setIsOpen(true)
+  }
+
   if (!isOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={handleOpenChat}
         className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 p-1 transition-transform duration-300 hover:scale-105 z-50 group"
         aria-label="Buka AI Assistant"
       >
