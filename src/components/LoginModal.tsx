@@ -20,6 +20,14 @@ export default function LoginModal({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Reset loading state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsLoading(false)
+      setError(null)
+    }
+  }, [isOpen])
+
   // Check if user just logged in and has checkout intent
   useEffect(() => {
     const checkLoginIntent = async () => {
@@ -28,6 +36,7 @@ export default function LoginModal({
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
           sessionStorage.removeItem('login-intent')
+          sessionStorage.removeItem('login-origin')
           onLoginSuccess?.()
         }
       }
@@ -36,7 +45,8 @@ export default function LoginModal({
     if (isOpen) {
       checkLoginIntent()
     }
-  }, [isOpen, onLoginSuccess])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
 
   const handleGoogleLogin = async () => {
     setIsLoading(true)
@@ -65,16 +75,31 @@ export default function LoginModal({
         sessionStorage.setItem('login-origin', currentOrigin)
       }
 
-      // Build redirect URL with current origin - explicitly use localhost for development
-      let redirectOrigin = currentOrigin
+      // Build redirect URL with current origin - explicitly set for both dev and production
+      let redirectOrigin: string
       if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
         redirectOrigin = 'http://localhost:3000'
+      } else if (currentOrigin.includes('qmeal.up.railway.app')) {
+        redirectOrigin = 'https://qmeal.up.railway.app'
+      } else if (currentOrigin.includes('qmeal.vercel.app')) {
+        redirectOrigin = 'https://qmeal.vercel.app'
+      } else {
+        // Fallback to current origin if it's a valid user app
+        redirectOrigin = currentOrigin
       }
       
       const redirectTo = `${redirectOrigin}/auth/callback?next=${encodeURIComponent(currentPathname)}`
       
       console.log('OAuth redirect to:', redirectTo) // Debug log
       console.log('Current origin:', currentOrigin) // Debug log
+
+      // Set a timeout to reset loading state if redirect doesn't happen
+      const loadingTimeout = setTimeout(() => {
+        setIsLoading(false)
+        setError('Redirect timeout. Silakan coba lagi.')
+        sessionStorage.removeItem('login-intent')
+        sessionStorage.removeItem('login-origin')
+      }, 10000) // 10 seconds timeout
 
       const { error: signInError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -87,14 +112,19 @@ export default function LoginModal({
         },
       })
 
+      // Clear timeout if we get a response
+      clearTimeout(loadingTimeout)
+
       if (signInError) {
         setError(signInError.message)
         setIsLoading(false)
         sessionStorage.removeItem('login-intent')
         sessionStorage.removeItem('login-origin')
+      } else {
+        // If successful, the redirect will happen automatically
+        // Keep loading state true until redirect happens
+        // onLoginSuccess will be called after redirect back via useEffect
       }
-      // If successful, the redirect will happen automatically
-      // onLoginSuccess will be called after redirect back via useEffect
     } catch (err) {
       console.error('Login error:', err)
       setError('Terjadi kesalahan saat login. Silakan coba lagi.')
@@ -120,10 +150,15 @@ export default function LoginModal({
         {/* Header with close button */}
         <div className="flex items-center justify-end p-4 sm:p-5">
           <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            onClick={() => {
+              setIsLoading(false)
+              setError(null)
+              sessionStorage.removeItem('login-intent')
+              sessionStorage.removeItem('login-origin')
+              onClose()
+            }}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
             aria-label="Tutup"
-            disabled={isLoading}
           >
             <X className="h-5 w-5 text-gray-600" />
           </button>

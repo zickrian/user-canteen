@@ -8,40 +8,15 @@ export async function GET(request: NextRequest) {
   const next = requestUrl.searchParams.get('next') || '/'
 
   // Priority order for determining origin:
-  // 1. Check if callback is from localhost (development)
-  // 2. Check referer header
-  // 3. Check origin header
-  // 4. Use request URL origin as fallback
+  // 1. Use request URL origin (most reliable - callback URL itself shows the correct domain)
+  // 2. Check if callback is from localhost (development)
+  // 3. Check referer header
+  // 4. Check origin header
+  // 5. Fallback to production URL
   
   const referer = request.headers.get('referer')
   const origin = request.headers.get('origin')
   
-  // Check if this callback is being called from localhost
-  const isLocalhostCallback = requestUrl.hostname === 'localhost' || 
-                               requestUrl.hostname === '127.0.0.1' ||
-                               referer?.includes('localhost:3000') ||
-                               referer?.includes('127.0.0.1:3000')
-  
-  // Determine safe origin - prioritize localhost for development
-  let safeOrigin: string
-  
-  if (isLocalhostCallback) {
-    // Force localhost for development
-    safeOrigin = 'http://localhost:3000'
-  } else if (referer) {
-    // Extract origin from referer
-    try {
-      const refererUrl = new URL(referer)
-      safeOrigin = refererUrl.origin
-    } catch {
-      safeOrigin = requestUrl.origin
-    }
-  } else if (origin) {
-    safeOrigin = origin
-  } else {
-    safeOrigin = requestUrl.origin
-  }
-
   // Validate origin - only allow user app origins (localhost or qmeal)
   const allowedUserAppOrigins = [
     'http://localhost:3000',
@@ -49,6 +24,40 @@ export async function GET(request: NextRequest) {
     'https://qmeal.up.railway.app',
     'https://qmeal.vercel.app'
   ]
+  
+  // Check if this callback is being called from localhost
+  const isLocalhostCallback = requestUrl.hostname === 'localhost' || 
+                               requestUrl.hostname === '127.0.0.1' ||
+                               referer?.includes('localhost:3000') ||
+                               referer?.includes('127.0.0.1:3000')
+  
+  // Determine safe origin - prioritize request URL origin (most reliable)
+  let safeOrigin: string
+  
+  // First, check if request URL origin is in allowed list (most reliable)
+  if (allowedUserAppOrigins.includes(requestUrl.origin)) {
+    safeOrigin = requestUrl.origin
+  } else if (isLocalhostCallback) {
+    // Force localhost for development
+    safeOrigin = 'http://localhost:3000'
+  } else if (referer) {
+    // Extract origin from referer
+    try {
+      const refererUrl = new URL(referer)
+      if (allowedUserAppOrigins.includes(refererUrl.origin)) {
+        safeOrigin = refererUrl.origin
+      } else {
+        safeOrigin = 'https://qmeal.up.railway.app'
+      }
+    } catch {
+      safeOrigin = 'https://qmeal.up.railway.app'
+    }
+  } else if (origin && allowedUserAppOrigins.includes(origin)) {
+    safeOrigin = origin
+  } else {
+    // Default to production URL for production, localhost for development
+    safeOrigin = isLocalhostCallback ? 'http://localhost:3000' : 'https://qmeal.up.railway.app'
+  }
   
   // Final validation - ensure we only redirect to user app
   if (!allowedUserAppOrigins.includes(safeOrigin)) {
