@@ -75,20 +75,15 @@ export default function LoginModal({
         sessionStorage.setItem('login-origin', currentOrigin)
       }
 
-      // Build redirect URL with current origin - explicitly set for both dev and production
-      let redirectOrigin: string
+      // Determine redirect URL - hardcode production URL, use localhost for development
+      let redirectTo: string
       if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
-        redirectOrigin = 'http://localhost:3000'
-      } else if (currentOrigin.includes('qmeal.up.railway.app')) {
-        redirectOrigin = 'https://qmeal.up.railway.app'
-      } else if (currentOrigin.includes('qmeal.vercel.app')) {
-        redirectOrigin = 'https://qmeal.vercel.app'
+        // Development: use localhost
+        redirectTo = `http://localhost:3000/auth/callback?next=${encodeURIComponent(currentPathname)}`
       } else {
-        // Fallback to current origin if it's a valid user app
-        redirectOrigin = currentOrigin
+        // Production: always use production URL (hardcoded)
+        redirectTo = `https://qmeal.up.railway.app/auth/callback?next=${encodeURIComponent(currentPathname)}`
       }
-      
-      const redirectTo = `${redirectOrigin}/auth/callback?next=${encodeURIComponent(currentPathname)}`
       
       console.log('OAuth redirect to:', redirectTo) // Debug log
       console.log('Current origin:', currentOrigin) // Debug log
