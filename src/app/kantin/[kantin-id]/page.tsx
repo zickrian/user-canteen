@@ -313,9 +313,12 @@ export default function KantinDetailPage() {
                   </div>
                 )}
                 {(kantin as any).avg_rating > 0 && (kantin as any).total_ratings > 0 && (
-                  <div className="flex items-center bg-orange-50 px-2 py-1 rounded-lg">
+                  <button
+                    onClick={() => router.push(`/kantin/${kantinId}/reviews`)}
+                    className="flex items-center bg-orange-50 px-2 py-1 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer group"
+                  >
                     {renderStars((kantin as any).avg_rating, (kantin as any).total_ratings)}
-                  </div>
+                  </button>
                 )}
               </div>
             </div>

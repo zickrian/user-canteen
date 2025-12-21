@@ -3,6 +3,7 @@
 import { Store, Star, Clock } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { KantinWithRating } from '@/lib/supabase'
 
 interface KantinCardProps {
@@ -10,7 +11,31 @@ interface KantinCardProps {
 }
 
 export default function KantinCard({ kantin }: KantinCardProps) {
+  const router = useRouter()
+
+  const handleRatingClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    router.push(`/kantin/${kantin.id}/reviews`)
+  }
+
   const renderStars = (rating: number, totalRatings: number) => {
+    if (totalRatings > 0) {
+      return (
+        <button
+          onClick={handleRatingClick}
+          className="flex items-center gap-1 hover:opacity-80 transition-opacity cursor-pointer group"
+        >
+          <Star className="h-3.5 w-3.5 fill-orange-400 text-orange-400 group-hover:scale-110 transition-transform" />
+          <span className="text-xs font-bold text-zinc-700 group-hover:text-orange-600 transition-colors">
+            {rating.toFixed(1)}/5
+          </span>
+          <span className="text-[10px] text-zinc-400 font-normal group-hover:text-zinc-500 transition-colors">
+            ({totalRatings})
+          </span>
+        </button>
+      )
+    }
     return (
       <div className="flex items-center gap-1">
         <Star className="h-3.5 w-3.5 fill-orange-400 text-orange-400" />
