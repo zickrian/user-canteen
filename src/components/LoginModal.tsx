@@ -75,16 +75,22 @@ export default function LoginModal({
         sessionStorage.setItem('login-origin', currentOrigin)
       }
 
-      // Determine redirect URL - hardcode production URL, use localhost for development
-      // IMPORTANT: This URL MUST be registered in Supabase Dashboard → Redirect URLs
+      // Determine redirect URL - use base URL only (no query params)
+      // Supabase validates redirectTo against Redirect URLs list
+      // Query params will be preserved by Supabase and passed to callback
       let redirectTo: string
       if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
-        // Development: use localhost
-        redirectTo = `http://localhost:3000/auth/callback?next=${encodeURIComponent(currentPathname)}`
+        // Development: use localhost base URL only
+        redirectTo = 'http://localhost:3000/auth/callback'
       } else {
-        // Production: always use production URL (hardcoded)
+        // Production: always use production URL (hardcoded, base URL only)
         // MUST match exactly with Supabase Dashboard → Redirect URLs
-        redirectTo = `https://qmeal.up.railway.app/auth/callback?next=${encodeURIComponent(currentPathname)}`
+        redirectTo = 'https://qmeal.up.railway.app/auth/callback'
+      }
+      
+      // Store the next path in sessionStorage to retrieve after redirect
+      if (currentPathname && currentPathname !== '/') {
+        sessionStorage.setItem('login-redirect-path', currentPathname)
       }
       
       console.log('[LoginModal] OAuth redirect to:', redirectTo) // Debug log

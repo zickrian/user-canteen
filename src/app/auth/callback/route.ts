@@ -5,6 +5,9 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  // Get next path from query params, or default to '/'
+  // Note: redirectTo in LoginModal is base URL only (no query params)
+  // to ensure exact match with Supabase Redirect URLs
   const next = requestUrl.searchParams.get('next') || '/'
 
   // Validate origin - only allow user app origins (localhost or qmeal)
