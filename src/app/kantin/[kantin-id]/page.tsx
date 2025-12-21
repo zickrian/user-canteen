@@ -198,13 +198,13 @@ export default function KantinDetailPage() {
         <div className="animate-pulse">
           {/* Header Full Width */}
           <div className="w-full h-80 bg-gray-200" />
-          
+
           {/* Info Section */}
           <div className="max-w-4xl mx-auto px-4 py-8">
             <div className="h-8 bg-gray-200 rounded w-1/3 mb-4" />
             <div className="h-4 bg-gray-200 rounded w-1/2 mb-4" />
             <div className="h-4 bg-gray-200 rounded w-1/4 mb-8" />
-            
+
             {/* Search and Filter */}
             <div className="h-12 bg-gray-200 rounded mb-4" />
             <div className="flex gap-4 mb-8">
@@ -212,7 +212,7 @@ export default function KantinDetailPage() {
                 <div key={i} className="h-16 w-20 bg-gray-200 rounded" />
               ))}
             </div>
-            
+
             {/* Menu Cards */}
             <div className="space-y-4">
               {[...Array(4)].map((_, i) => (
@@ -261,24 +261,24 @@ export default function KantinDetailPage() {
 
   return (
     <div className="min-h-screen bg-white">
-        {/* Header Section - Full Width */}
-        <div className="relative w-full h-72 bg-gray-100">
+      {/* Header Section - Full Width */}
+      <div className="relative w-full h-72 bg-gray-100">
         {kantin.foto_profil ? (
           <Image
             src={kantin.foto_profil}
             alt={kantin.nama_kantin}
             fill
-              className="object-cover"
-              sizes="100vw"
-              quality={95}
-              priority
+            className="object-cover"
+            sizes="100vw"
+            quality={95}
+            priority
           />
         ) : (
           <div className="flex items-center justify-center h-full">
             <Store className="h-32 w-32 text-gray-300" />
           </div>
         )}
-        
+
         {/* Back Button */}
         <button
           onClick={() => router.back()}
@@ -286,14 +286,13 @@ export default function KantinDetailPage() {
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        
+
         {/* Status Badge */}
         <div className="absolute top-4 right-4">
-          <span className={`px-4 py-2 rounded-full font-bold ${
-            kantin.buka_tutup 
-              ? 'bg-green-500 text-white' 
+          <span className={`px-4 py-2 rounded-full font-bold ${kantin.buka_tutup
+              ? 'bg-green-500 text-white'
               : 'bg-red-500 text-white'
-          }`}>
+            }`}>
             {kantin.buka_tutup ? 'BUKA' : 'TUTUP'}
           </span>
         </div>
@@ -303,7 +302,7 @@ export default function KantinDetailPage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-6 space-y-3">
           <h1 className="text-3xl font-bold text-black">{kantin.nama_kantin}</h1>
-          
+
           {/* Rating */}
           {(kantin as any).avg_rating ? (
             <div className="flex items-center gap-3">
@@ -376,9 +375,9 @@ export default function KantinDetailPage() {
                 <UtensilsCrossed className="h-12 w-12 text-gray-400" />
               </div>
               <p className="text-gray-700 text-lg font-medium">
-            {selectedCategory !== 'semua'
-              ? 'Tidak ada menu di kategori ini'
-              : 'Belum ada menu tersedia'}
+                {selectedCategory !== 'semua'
+                  ? 'Tidak ada menu di kategori ini'
+                  : 'Belum ada menu tersedia'}
               </p>
             </div>
           ) : (
@@ -430,11 +429,10 @@ export default function KantinDetailPage() {
                 setShowTableModal(false)
               }}
               disabled={!tableNumber}
-            className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-150 ${
-                tableNumber
+              className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-150 ${tableNumber
                   ? 'bg-black text-white hover:bg-gray-900 active:scale-95'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
+                }`}
             >
               <CheckCircle2 className="h-5 w-5" />
               Simpan Nomor Meja
@@ -451,7 +449,7 @@ export default function KantinDetailPage() {
           setShowLoginModal(false)
           // Proceed to checkout after login
           setTimeout(() => {
-            proceedToCheckout()
+            handleCheckoutClick()
           }, 500)
         }}
         message="Sepertinya kamu belum login. Login terlebih dahulu untuk melanjutkan pemesanan."
@@ -482,11 +480,10 @@ function CategoryNav({
             <button
               key={cat}
               onClick={() => onSelect(cat)}
-              className={`px-3 pb-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
-                isActive
+              className={`px-3 pb-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${isActive
                   ? 'border-red-600 text-red-600'
                   : 'border-transparent text-gray-600 hover:text-red-600'
-              }`}
+                }`}
             >
               {label}
             </button>
