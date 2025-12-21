@@ -36,11 +36,12 @@ type CustomerDetails = {
 
 export async function POST(request: NextRequest) {
   try {
-    const { kiosOrders, customerDetails, paymentMethod, grossAmount } = await request.json() as {
+    const { kiosOrders, customerDetails, paymentMethod, grossAmount, userId } = await request.json() as {
       kiosOrders: KiosOrder[]
       customerDetails: CustomerDetails
       paymentMethod: 'cash' | 'qris'
       grossAmount: number
+      userId?: string | null
     }
 
     // Validate required fields
@@ -85,7 +86,8 @@ export async function POST(request: NextRequest) {
           nomor_meja: customerDetails.nomor_meja || null,
           tipe_pesanan: customerDetails.tipe_pesanan || null,
           total_harga: kiosOrder.subtotal,
-          status: 'menunggu'
+          status: 'menunggu',
+          user_id: userId || null
         })
 
       if (orderError) {
@@ -150,7 +152,8 @@ export async function POST(request: NextRequest) {
             status: 'pending',
             email_pelanggan: customerDetails.email,
             nomor_meja: customerDetails.nomor_meja,
-            tipe_pesanan: customerDetails.tipe_pesanan
+            tipe_pesanan: customerDetails.tipe_pesanan,
+            payer_id: userId || null
           })
 
         if (paymentError) {

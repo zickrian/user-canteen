@@ -1,8 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import { Search, ShoppingCart, X } from 'lucide-react'
 import { useCart } from '@/contexts/CartContext'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
+import LoginModal from './LoginModal'
+import ProfileButton from './ProfileButton'
 
 interface SearchBarProps {
   value: string
@@ -13,9 +17,11 @@ interface SearchBarProps {
 export default function SearchBar({ value, onChange, showCart = false }: SearchBarProps) {
   const router = useRouter()
   const { getItemCount } = useCart()
+  const { isAuthenticated } = useAuth()
+  const [showLoginModal, setShowLoginModal] = useState(false)
   const itemCount = getItemCount()
 
-  const handleCheckout = () => {
+  const proceedToCheckout = () => {
     const tableNumber = typeof window !== 'undefined'
       ? sessionStorage.getItem('table-number')
       : null
@@ -27,6 +33,16 @@ export default function SearchBar({ value, onChange, showCart = false }: SearchB
     }
 
     router.push('/checkout')
+  }
+
+  const handleCheckout = () => {
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      setShowLoginModal(true)
+      return
+    }
+
+    proceedToCheckout()
   }
 
   return (
@@ -56,20 +72,38 @@ export default function SearchBar({ value, onChange, showCart = false }: SearchB
 
         {/* Shopping Cart Icon - only show if showCart is true */}
         {showCart && (
-          <button
-            type="button"
-            onClick={handleCheckout}
-            className="relative p-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            <ShoppingCart className="h-6 w-6" />
-            {itemCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
-                {itemCount > 99 ? '99+' : itemCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleCheckout}
+              className="relative p-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              <ShoppingCart className="h-6 w-6" />
+              {itemCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                  {itemCount > 99 ? '99+' : itemCount}
+                </span>
+              )}
+            </button>
+            {/* Profile Button - only show if authenticated */}
+            <ProfileButton />
+          </div>
         )}
       </div>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoginSuccess={() => {
+          setShowLoginModal(false)
+          // Proceed to checkout after login
+          setTimeout(() => {
+            proceedToCheckout()
+          }, 500)
+        }}
+        message="Sepertinya kamu belum login. Login terlebih dahulu untuk melanjutkan pemesanan."
+      />
     </div>
   )
 }

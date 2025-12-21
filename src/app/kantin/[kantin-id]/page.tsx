@@ -8,13 +8,16 @@ import { Kantin, Menu } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import AIAssistant from '@/components/AIAssistant'
 import MenuCard from '@/components/MenuCard'
+import LoginModal from '@/components/LoginModal'
 import { useCart } from '@/contexts/CartContext'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function KantinDetailPage() {
   const params = useParams()
   const router = useRouter()
   const kantinId = params['kantin-id'] as string
   const { getItemCount } = useCart()
+  const { isAuthenticated } = useAuth()
   const itemCount = getItemCount()
   const [kantin, setKantin] = useState<Kantin | null>(null)
   const [menus, setMenus] = useState<Menu[]>([])
@@ -23,6 +26,7 @@ export default function KantinDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [tableNumber, setTableNumber] = useState<string>('')
   const [showTableModal, setShowTableModal] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<string>('semua')
 
   useEffect(() => {
@@ -143,6 +147,12 @@ export default function KantinDetailPage() {
   }
 
   const handleCheckoutClick = () => {
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      setShowLoginModal(true)
+      return
+    }
+
     const savedGlobal = typeof window !== 'undefined'
       ? sessionStorage.getItem('table-number')
       : null
@@ -432,6 +442,20 @@ export default function KantinDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoginSuccess={() => {
+          setShowLoginModal(false)
+          // Proceed to checkout after login
+          setTimeout(() => {
+            proceedToCheckout()
+          }, 500)
+        }}
+        message="Sepertinya kamu belum login. Login terlebih dahulu untuk melanjutkan pemesanan."
+      />
     </div>
   )
 }

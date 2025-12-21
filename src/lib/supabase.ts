@@ -94,6 +94,17 @@ export type Pesanan = {
   email: string | null
   nomor_meja: string | null
   tipe_pesanan: string | null
+  user_id: string | null
+}
+
+export type UserProfile = {
+  id: string
+  email: string
+  full_name: string | null
+  avatar_url: string | null
+  phone: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type DetailPesanan = {

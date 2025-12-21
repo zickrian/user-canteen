@@ -15,6 +15,7 @@ type KiosGroup = {
 export default function CheckoutPage() {
   const router = useRouter()
   const { cart, updateQuantity, removeItem, clearCart } = useCart()
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [showQR, setShowQR] = useState(false)
   const [qrCode, setQrCode] = useState<string>('')
@@ -204,7 +205,8 @@ export default function CheckoutPage() {
             kiosOrders,
             customerDetails: formData,
             paymentMethod: paymentMethod,
-            grossAmount: cart.totalPrice
+            grossAmount: cart.totalPrice,
+            userId: user?.id || null
           }),
         })
 
@@ -242,7 +244,8 @@ export default function CheckoutPage() {
           menu: item.menu,
           quantity: item.quantity
         })),
-        paymentMethod: paymentMethod
+        paymentMethod: paymentMethod,
+        userId: user?.id || null
       }
 
       const endpoint = paymentMethod === 'cash' 

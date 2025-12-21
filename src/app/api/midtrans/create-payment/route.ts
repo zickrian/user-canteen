@@ -90,7 +90,8 @@ export async function POST(request: NextRequest) {
         nomor_meja: orderData.customerDetails.nomor_meja || null,
         tipe_pesanan: orderData.customerDetails.tipe_pesanan || null,
         total_harga: orderData.grossAmount,
-        status: 'menunggu'
+        status: 'menunggu',
+        user_id: orderData.userId || null
       })
       .select()
       .single()
@@ -135,7 +136,8 @@ export async function POST(request: NextRequest) {
         status: 'pending',
         email_pelanggan: orderData.customerDetails.email,
         nomor_meja: orderData.customerDetails.nomor_meja,
-        tipe_pesanan: orderData.customerDetails.tipe_pesanan
+        tipe_pesanan: orderData.customerDetails.tipe_pesanan,
+        payer_id: orderData.userId || null
       })
 
     if (paymentError) {
