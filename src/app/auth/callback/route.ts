@@ -87,27 +87,42 @@ export async function GET(request: NextRequest) {
     }
 
     // After exchangeCodeForSession, redirect to next path
+    // ALWAYS redirect to user app (qmeal), never admin
     // Build redirect URL using safe origin (guaranteed to be user app, never admin)
     let redirectUrl: URL
     
-    try {
-      // Try to parse next as full URL
-      const nextUrl = new URL(next)
-      // Only use it if it's from allowed user app origins
-      if (ALLOWED_ORIGINS.includes(nextUrl.origin)) {
-        redirectUrl = nextUrl
-      } else {
-        // Force to safe origin (user app only)
-        redirectUrl = new URL(next.startsWith('/') ? next : `/${next}`, safeOrigin)
+    // If next is '/', always redirect to home page of user app
+    if (next === '/' || !next) {
+      redirectUrl = new URL('/', safeOrigin)
+    } else {
+      try {
+        // Try to parse next as full URL
+        const nextUrl = new URL(next)
+        // Only use it if it's from allowed user app origins
+        if (ALLOWED_ORIGINS.includes(nextUrl.origin)) {
+          redirectUrl = nextUrl
+        } else {
+          // Force to safe origin (user app only) - use path from next if valid
+          const path = nextUrl.pathname || '/'
+          redirectUrl = new URL(path, safeOrigin)
+        }
+      } catch {
+        // next is not a full URL, treat as path and use safe origin
+        // Ensure path starts with / and doesn't contain admin references
+        let path = next.startsWith('/') ? next : `/${next}`
+        // Safety: if path contains 'admin', redirect to home instead
+        if (path.toLowerCase().includes('admin')) {
+          path = '/'
+        }
+        redirectUrl = new URL(path, safeOrigin)
       }
-    } catch {
-      // next is not a full URL, treat as path and use safe origin
-      redirectUrl = new URL(next.startsWith('/') ? next : `/${next}`, safeOrigin)
     }
     
     // CRITICAL: Final safety check - ensure redirect is ONLY to user app origins
+    // NEVER redirect to admin, always use safe origin (user app)
     if (!ALLOWED_ORIGINS.includes(redirectUrl.origin)) {
-      redirectUrl = new URL(next.startsWith('/') ? next : `/${next}`, safeOrigin)
+      // If somehow we got an invalid origin, force to home page of user app
+      redirectUrl = new URL('/', safeOrigin)
     }
     
     // Add query parameter to indicate successful login
