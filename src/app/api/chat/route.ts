@@ -45,6 +45,14 @@ ATURAN PENTING:
 3. Format harga dengan "Rp X.XXX"
 4. Jika user tanya di luar topik kantin, arahkan kembali dengan sopan
 
+PENTING - PEMBEDaan MAKANAN vs MINUMAN:
+- MAKANAN: Menu dengan kategori "Makan Pagi" atau "Makan Siang" (BUKAN "Minuman")
+- MINUMAN: Menu dengan kategori "Minuman"
+- Ketika user tanya "makanan termurah" atau "makanan termahal", HANYA jawab dengan MAKANAN (bukan minuman)
+- Ketika user tanya "makanan di [kios]", HANYA jawab dengan MAKANAN dari kios tersebut
+- Ketika user tanya "makanan apa aja", HANYA jawab dengan MAKANAN (bukan minuman)
+- JANGAN pernah mencampur makanan dan minuman ketika user spesifik tanya tentang "makanan"
+
 UNTUK PERMINTAAN PAKET/COMBO DENGAN BUDGET:
 - Jika user minta "makanan dan minuman dengan budget X", pilih 1 makanan + 1 minuman yang totalnya tidak melebihi budget
 - Berikan 2-3 pilihan kombinasi yang berbeda
@@ -121,6 +129,78 @@ function formatMenuContext(menus: any[]): string {
 }
 
 /**
+ * Detect query type from user message
+ */
+function detectQueryType(msg: string): {
+  isMakananQuery: boolean
+  isMinumanQuery: boolean
+  isTermurah: boolean
+  isTermahal: boolean
+  isStoreQuery: boolean
+} {
+  const lowerMsg = msg.toLowerCase()
+  
+  // Check for makanan query
+  const isMakananQuery = /\bmakanan\b/.test(lowerMsg) || 
+                        (/\bmakan\b/.test(lowerMsg) && !/\bminum\b/.test(lowerMsg))
+  
+  // Check for minuman query
+  const isMinumanQuery = /\bminuman\b/.test(lowerMsg) || 
+                         (/\bminum\b/.test(lowerMsg) && !/\bmakan\b/.test(lowerMsg))
+  
+  // Check for termurah
+  const isTermurah = /\btermurah\b/.test(lowerMsg) || 
+                     /\bmurah\b/.test(lowerMsg) ||
+                     /\bcheapest\b/.test(lowerMsg)
+  
+  // Check for termahal
+  const isTermahal = /\btermahal\b/.test(lowerMsg) || 
+                     /\bmahal\b/.test(lowerMsg) ||
+                     /\bmost\s+expensive\b/.test(lowerMsg) ||
+                     /\bhighest\b/.test(lowerMsg)
+  
+  // Check for store/kios query
+  const isStoreQuery = /\b(kios|toko|warung|kantin|kedai|stan|booth)\s+/.test(lowerMsg) ||
+                       /\bdi\s+[a-z]+\s+(apa|menu|jual)/.test(lowerMsg) ||
+                       /[a-z]+\s+(jual|ada)\s+(apa|menu)/.test(lowerMsg)
+  
+  return {
+    isMakananQuery,
+    isMinumanQuery,
+    isTermurah,
+    isTermahal,
+    isStoreQuery,
+  }
+}
+
+/**
+ * Filter menus based on query type
+ */
+function filterMenusByQuery(menus: any[], queryType: ReturnType<typeof detectQueryType>): any[] {
+  let filtered = menus
+  
+  // Filter by makanan/minuman
+  if (queryType.isMakananQuery) {
+    filtered = filtered.filter(isMakanan)
+    console.log('[filterMenusByQuery] Filtered to makanan:', filtered.length)
+  } else if (queryType.isMinumanQuery) {
+    filtered = filtered.filter(isMinuman)
+    console.log('[filterMenusByQuery] Filtered to minuman:', filtered.length)
+  }
+  
+  // Sort by price
+  if (queryType.isTermurah) {
+    filtered = [...filtered].sort((a, b) => a.harga - b.harga)
+    console.log('[filterMenusByQuery] Sorted by cheapest')
+  } else if (queryType.isTermahal) {
+    filtered = [...filtered].sort((a, b) => b.harga - a.harga)
+    console.log('[filterMenusByQuery] Sorted by most expensive')
+  }
+  
+  return filtered
+}
+
+/**
  * Generate response using Gemini
  */
 async function generateResponse(
@@ -138,7 +218,11 @@ async function generateResponse(
   console.log('[generateResponse] Initializing Gemini...')
   const ai = new GoogleGenAI({ apiKey })
 
-  const menuContext = formatMenuContext(menus)
+  // Detect query type and filter menus accordingly
+  const queryType = detectQueryType(userMessage)
+  const filteredMenus = filterMenusByQuery(menus, queryType)
+  
+  const menuContext = formatMenuContext(filteredMenus.length > 0 ? filteredMenus : menus)
   const kantinContext = kantinInfo
     ? `Kantin: ${kantinInfo.nama_kantin}, Jam: ${kantinInfo.jam_buka || '?'} - ${kantinInfo.jam_tutup || '?'}, Status: ${kantinInfo.buka_tutup ? 'Buka' : 'Tutup'}`
     : 'Mode: Semua Kantin'
@@ -153,6 +237,27 @@ async function generateResponse(
     ).join('\n') + '\n'
   }
 
+  // Check if this is a global query (all stores)
+  const isGlobalQuery = /\b(semua\s+kios|semua\s+toko|semua\s+warung|semua\s+kantin|dari\s+semua)\b/i.test(userMessage)
+  
+  // Add specific instructions based on query type
+  let queryInstructions = ''
+  if (isGlobalQuery) {
+    queryInstructions = '\nPENTING: User menanya tentang menu dari SEMUA KIOS. Berikan menu dari berbagai kios yang tersedia, bukan hanya dari satu kios.'
+  }
+  
+  if (queryType.isMakananQuery && queryType.isTermurah) {
+    queryInstructions += '\nPENTING: User menanya tentang MAKANAN TERMURAH. HANYA jawab dengan MAKANAN (bukan minuman) yang paling murah dari daftar menu di atas.'
+  } else if (queryType.isMakananQuery && queryType.isTermahal) {
+    queryInstructions += '\nPENTING: User menanya tentang MAKANAN TERMAHAL. HANYA jawab dengan MAKANAN (bukan minuman) yang paling mahal dari daftar menu di atas.'
+  } else if (queryType.isMakananQuery) {
+    queryInstructions += '\nPENTING: User menanya tentang MAKANAN. HANYA jawab dengan MAKANAN (bukan minuman) dari daftar menu di atas.'
+  } else if (queryType.isTermurah) {
+    queryInstructions += '\nPENTING: User menanya tentang menu TERMURAH. Berikan menu yang paling murah dari daftar menu di atas.'
+  } else if (queryType.isTermahal) {
+    queryInstructions += '\nPENTING: User menanya tentang menu TERMAHAL. Berikan menu yang paling mahal dari daftar menu di atas.'
+  }
+
   const prompt = `${SYSTEM_PROMPT}
 
 KONTEKS KANTIN:
@@ -161,6 +266,7 @@ ${kantinContext}
 DAFTAR MENU TERSEDIA:
 ${menuContext}
 ${historyContext}
+${queryInstructions}
 ---
 Pelanggan: "${userMessage}"
 
@@ -213,10 +319,40 @@ function extractBudget(msg: string): number | null {
 }
 
 /**
+ * Check if menu is makanan (not minuman)
+ */
+function isMakanan(menu: any): boolean {
+  const kategoriStr = menu.kategori_menu?.join(' ').toLowerCase() || ''
+  return (kategoriStr.includes('makan') || kategoriStr.includes('makan pagi') || kategoriStr.includes('makan siang')) && 
+         !kategoriStr.includes('minuman')
+}
+
+/**
+ * Check if menu is minuman
+ */
+function isMinuman(menu: any): boolean {
+  const kategoriStr = menu.kategori_menu?.join(' ').toLowerCase() || ''
+  return kategoriStr.includes('minuman')
+}
+
+/**
  * Extract store/kantin name from message and filter menus
  */
 function extractStoreFilter(msg: string, menus: any[]): { storeName: string | null; filteredMenus: any[] } {
   const lowerMsg = msg.toLowerCase()
+  
+  // Check if user explicitly asks for "semua kios" or "dari semua kios" - don't filter
+  const globalQueryPatterns = [
+    /\b(semua\s+kios|semua\s+toko|semua\s+warung|semua\s+kantin|dari\s+semua\s+kios|dari\s+semua\s+toko|dari\s+semua\s+warung|dari\s+semua\s+kantin)\b/i,
+    /\bdari\s+semua\b/i,
+  ]
+  
+  for (const pattern of globalQueryPatterns) {
+    if (pattern.test(msg)) {
+      console.log('[extractStoreFilter] Global query detected - no store filter applied')
+      return { storeName: null, filteredMenus: menus }
+    }
+  }
   
   // Get unique store names from menus
   const storeNames = [...new Set(menus.map(m => m.kantin?.nama_kantin).filter(Boolean))] as string[]
@@ -224,69 +360,66 @@ function extractStoreFilter(msg: string, menus: any[]): { storeName: string | nu
   console.log('[extractStoreFilter] Available stores:', storeNames)
   console.log('[extractStoreFilter] Message:', lowerMsg)
   
-  // Check if any store name is mentioned in the message (partial match)
-  for (const storeName of storeNames) {
-    const storeNameLower = storeName.toLowerCase()
-    // Split store name into words for partial matching
-    const storeWords = storeNameLower.split(/\s+/)
-    
-    // Check if message contains the store name or significant part of it
-    if (lowerMsg.includes(storeNameLower)) {
-      const filtered = menus.filter(m => 
-        m.kantin?.nama_kantin?.toLowerCase() === storeNameLower
-      )
-      console.log('[extractStoreFilter] Exact match found:', storeName, 'menus:', filtered.length)
-      return { storeName, filteredMenus: filtered }
-    }
-    
-    // Check partial match (at least 3 chars word)
-    for (const word of storeWords) {
-      if (word.length >= 3 && lowerMsg.includes(word)) {
-        const filtered = menus.filter(m => 
-          m.kantin?.nama_kantin?.toLowerCase() === storeNameLower
-        )
-        console.log('[extractStoreFilter] Partial match found:', storeName, 'via word:', word, 'menus:', filtered.length)
-        return { storeName, filteredMenus: filtered }
-      }
-    }
-    
-    // Also check for common typos/variations (jus vs juice)
-    const variations: Record<string, string[]> = {
-      'juice': ['jus', 'juice'],
-      'jus': ['jus', 'juice'],
-    }
-    
-    for (const word of storeWords) {
-      const wordVariations = variations[word] || []
-      for (const variant of wordVariations) {
-        if (lowerMsg.includes(variant)) {
-          const filtered = menus.filter(m => 
-            m.kantin?.nama_kantin?.toLowerCase() === storeNameLower
-          )
-          console.log('[extractStoreFilter] Variation match found:', storeName, 'via variant:', variant, 'menus:', filtered.length)
-          return { storeName, filteredMenus: filtered }
-        }
-      }
-    }
-  }
-  
-  // Check for common patterns like "toko X", "warung X", "kantin X"
+  // Check for common patterns like "kios X", "toko X", "warung X", "kantin X", "di X"
+  // But exclude if followed by "semua"
   const storePatterns = [
-    /(?:toko|warung|kantin|kedai|stan|booth)\s+([a-zA-Z0-9\s]+?)(?:\s+apa|\s+menu|\?|$)/i,
-    /(?:di|dari)\s+([a-zA-Z0-9\s]+?)(?:\s+apa|\s+menu|\?|$)/i,
+    /(?:kios|toko|warung|kantin|kedai|stan|booth)\s+([a-zA-Z0-9\s]+?)(?:\s+apa|\s+menu|\s+jual|\?|$)/i,
+    /(?:di|dari)\s+([a-zA-Z0-9\s]+?)(?:\s+apa|\s+menu|\s+jual|\?|$)/i,
+    /([a-zA-Z0-9\s]+?)\s+(?:jual|ada|menu)\s+(?:apa|apa\s+aja)/i,
   ]
   
   for (const pattern of storePatterns) {
     const match = msg.match(pattern)
     if (match && match[1]) {
       const searchTerm = match[1].trim().toLowerCase()
+      
+      // Skip if search term is "semua"
+      if (searchTerm === 'semua' || searchTerm.includes('semua')) {
+        continue
+      }
+      
       // Find store that matches the search term
       for (const storeName of storeNames) {
-        if (storeName.toLowerCase().includes(searchTerm) || 
-            searchTerm.includes(storeName.toLowerCase())) {
+        const storeNameLower = storeName.toLowerCase()
+        // Check if search term matches store name (partial or full)
+        if (storeNameLower.includes(searchTerm) || 
+            searchTerm.includes(storeNameLower) ||
+            storeNameLower.split(/\s+/).some(word => word.length >= 3 && searchTerm.includes(word)) ||
+            searchTerm.split(/\s+/).some(word => word.length >= 3 && storeNameLower.includes(word))) {
           const filtered = menus.filter(m => 
-            m.kantin?.nama_kantin?.toLowerCase() === storeName.toLowerCase()
+            m.kantin?.nama_kantin?.toLowerCase() === storeNameLower
           )
+          console.log('[extractStoreFilter] Pattern match found:', storeName, 'via pattern, menus:', filtered.length)
+          return { storeName, filteredMenus: filtered }
+        }
+      }
+    }
+  }
+  
+  // Check if any store name is mentioned in the message (partial match)
+  // But only if not asking for "semua"
+  if (!lowerMsg.includes('semua')) {
+    for (const storeName of storeNames) {
+      const storeNameLower = storeName.toLowerCase()
+      // Split store name into words for partial matching
+      const storeWords = storeNameLower.split(/\s+/)
+      
+      // Check if message contains the store name or significant part of it
+      if (lowerMsg.includes(storeNameLower)) {
+        const filtered = menus.filter(m => 
+          m.kantin?.nama_kantin?.toLowerCase() === storeNameLower
+        )
+        console.log('[extractStoreFilter] Exact match found:', storeName, 'menus:', filtered.length)
+        return { storeName, filteredMenus: filtered }
+      }
+      
+      // Check partial match (at least 3 chars word)
+      for (const word of storeWords) {
+        if (word.length >= 3 && lowerMsg.includes(word)) {
+          const filtered = menus.filter(m => 
+            m.kantin?.nama_kantin?.toLowerCase() === storeNameLower
+          )
+          console.log('[extractStoreFilter] Partial match found:', storeName, 'via word:', word, 'menus:', filtered.length)
           return { storeName, filteredMenus: filtered }
         }
       }
@@ -329,16 +462,10 @@ function generateSimpleResponse(userMessage: string, menus: any[]): string {
     console.log('[generateSimpleResponse] Combo request with budget:', budget)
     
     // Find makanan - kategori yang mengandung "Makan" tapi bukan "Minuman"
-    const makananList = workingMenus.filter(m => {
-      const kategoriStr = m.kategori_menu?.join(' ').toLowerCase() || ''
-      return kategoriStr.includes('makan') && !kategoriStr.includes('minuman')
-    })
+    const makananList = workingMenus.filter(isMakanan)
     
     // Find minuman - kategori yang mengandung "Minuman"
-    const minumanList = workingMenus.filter(m => {
-      const kategoriStr = m.kategori_menu?.join(' ').toLowerCase() || ''
-      return kategoriStr.includes('minuman')
-    })
+    const minumanList = workingMenus.filter(isMinuman)
     
     console.log('[generateSimpleResponse] Found makanan:', makananList.length, 'minuman:', minumanList.length)
     
@@ -386,40 +513,63 @@ function generateSimpleResponse(userMessage: string, menus: any[]): string {
     return `Oke! Berikut paket makanan + minuman dengan budget Rp ${budget.toLocaleString('id-ID')}:\n\n${comboList}\n\nMau pilih yang mana? 😊`
   }
   
+  // Detect query type
+  const queryType = detectQueryType(userMessage)
+  
   // Filter menus based on user message
   let filteredMenus = workingMenus
   let responsePrefix = storeName ? `Berikut menu dari ${storeName}` : 'Berikut menu yang tersedia'
   
-  // Check for minuman/minum
-  if (lowerMsg.includes('minum') || lowerMsg.includes('minuman') || lowerMsg.includes('es') || lowerMsg.includes('jus')) {
-    filteredMenus = workingMenus.filter(m => 
-      m.kategori_menu?.some((k: string) => k.toLowerCase().includes('minuman'))
-    )
-    if (budget) {
-      filteredMenus = filteredMenus.filter(m => m.harga <= budget)
-      responsePrefix = storeName 
-        ? `Berikut pilihan minuman dari ${storeName} dengan budget Rp ${budget.toLocaleString('id-ID')}`
-        : `Berikut pilihan minuman dengan budget Rp ${budget.toLocaleString('id-ID')}`
+  // Filter by makanan/minuman first
+  if (queryType.isMakananQuery) {
+    filteredMenus = workingMenus.filter(isMakanan)
+    responsePrefix = storeName ? `Berikut makanan dari ${storeName}` : 'Berikut makanan yang tersedia'
+  } else if (queryType.isMinumanQuery) {
+    filteredMenus = workingMenus.filter(isMinuman)
+    responsePrefix = storeName ? `Berikut minuman dari ${storeName}` : 'Berikut minuman yang tersedia'
+  }
+  
+  // Sort by price if termurah or termahal
+  if (queryType.isTermurah) {
+    filteredMenus = [...filteredMenus].sort((a, b) => a.harga - b.harga)
+    if (queryType.isMakananQuery) {
+      responsePrefix = storeName ? `Berikut makanan termurah dari ${storeName}` : 'Berikut makanan termurah'
+    } else if (queryType.isMinumanQuery) {
+      responsePrefix = storeName ? `Berikut minuman termurah dari ${storeName}` : 'Berikut minuman termurah'
     } else {
-      responsePrefix = storeName ? `Berikut pilihan minuman dari ${storeName}` : 'Berikut pilihan minuman'
+      responsePrefix = storeName ? `Berikut menu termurah dari ${storeName}` : 'Berikut menu termurah'
+    }
+  } else if (queryType.isTermahal) {
+    filteredMenus = [...filteredMenus].sort((a, b) => b.harga - a.harga)
+    if (queryType.isMakananQuery) {
+      responsePrefix = storeName ? `Berikut makanan termahal dari ${storeName}` : 'Berikut makanan termahal'
+    } else if (queryType.isMinumanQuery) {
+      responsePrefix = storeName ? `Berikut minuman termahal dari ${storeName}` : 'Berikut minuman termahal'
+    } else {
+      responsePrefix = storeName ? `Berikut menu termahal dari ${storeName}` : 'Berikut menu termahal'
     }
   }
-  // Check for makanan/makan
-  else if (lowerMsg.includes('makan') || lowerMsg.includes('makanan') || lowerMsg.includes('nasi') || lowerMsg.includes('goreng')) {
-    filteredMenus = workingMenus.filter(m => 
-      m.kategori_menu?.some((k: string) => k.toLowerCase().includes('makan'))
-    )
-    if (budget) {
-      filteredMenus = filteredMenus.filter(m => m.harga <= budget)
+  
+  // Apply budget filter if specified
+  if (budget) {
+    filteredMenus = filteredMenus.filter(m => m.harga <= budget)
+    if (queryType.isMakananQuery) {
       responsePrefix = storeName
-        ? `Berikut pilihan makanan dari ${storeName} dengan budget Rp ${budget.toLocaleString('id-ID')}`
-        : `Berikut pilihan makanan dengan budget Rp ${budget.toLocaleString('id-ID')}`
+        ? `Berikut makanan dari ${storeName} dengan budget Rp ${budget.toLocaleString('id-ID')}`
+        : `Berikut makanan dengan budget Rp ${budget.toLocaleString('id-ID')}`
+    } else if (queryType.isMinumanQuery) {
+      responsePrefix = storeName
+        ? `Berikut minuman dari ${storeName} dengan budget Rp ${budget.toLocaleString('id-ID')}`
+        : `Berikut minuman dengan budget Rp ${budget.toLocaleString('id-ID')}`
     } else {
-      responsePrefix = storeName ? `Berikut pilihan makanan dari ${storeName}` : 'Berikut pilihan makanan'
+      responsePrefix = storeName
+        ? `Berikut menu dari ${storeName} dengan budget Rp ${budget.toLocaleString('id-ID')}`
+        : `Berikut menu dengan budget Rp ${budget.toLocaleString('id-ID')}`
     }
   }
-  // Check for snack/jajan
-  else if (lowerMsg.includes('snack') || lowerMsg.includes('jajan') || lowerMsg.includes('cemilan')) {
+  
+  // Fallback: Check for snack/jajan
+  if (filteredMenus.length === 0 && (lowerMsg.includes('snack') || lowerMsg.includes('jajan') || lowerMsg.includes('cemilan'))) {
     filteredMenus = workingMenus.filter(m => 
       m.kategori_menu?.some((k: string) => k.toLowerCase().includes('snack'))
     )
@@ -432,15 +582,9 @@ function generateSimpleResponse(userMessage: string, menus: any[]): string {
       responsePrefix = storeName ? `Berikut pilihan snack dari ${storeName}` : 'Berikut pilihan snack'
     }
   }
-  // Check for budget only
-  else if (budget) {
-    filteredMenus = workingMenus.filter(m => m.harga <= budget)
-    responsePrefix = storeName
-      ? `Berikut menu dari ${storeName} dengan budget Rp ${budget.toLocaleString('id-ID')}`
-      : `Berikut menu dengan budget Rp ${budget.toLocaleString('id-ID')}`
-  }
+  
   // Check for populer/laris/rekomendasi
-  else if (lowerMsg.includes('populer') || lowerMsg.includes('laris') || lowerMsg.includes('rekomendasi') || lowerMsg.includes('enak')) {
+  if (filteredMenus.length === 0 && (lowerMsg.includes('populer') || lowerMsg.includes('laris') || lowerMsg.includes('rekomendasi') || lowerMsg.includes('enak'))) {
     filteredMenus = [...workingMenus].sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0))
     responsePrefix = storeName ? `Berikut menu populer dari ${storeName}` : 'Berikut menu populer'
   }
@@ -523,8 +667,12 @@ export async function POST(req: NextRequest) {
     
     try {
       console.log('[Chat] Fetching menus from database...')
-      menus = await getMenus(kantin_id, 30)
-      console.log(`[Chat] Found ${menus.length} menus`)
+      // Check if query is global (asking for all stores)
+      const isGlobalQuery = /\b(semua\s+kios|semua\s+toko|semua\s+warung|semua\s+kantin|dari\s+semua)\b/i.test(trimmedMessage)
+      // Increase limit for global queries to get more menus from all stores
+      const menuLimit = isGlobalQuery ? 100 : 30
+      menus = await getMenus(kantin_id, menuLimit)
+      console.log(`[Chat] Found ${menus.length} menus (limit: ${menuLimit}, global: ${isGlobalQuery})`)
       
       if (kantin_id) {
         kantinInfo = await getKantinInfo(kantin_id)
@@ -560,6 +708,9 @@ export async function POST(req: NextRequest) {
     let menuData: any[] = []
     const budget = extractBudget(lowerMsg)
     
+    // Detect query type
+    const queryType = detectQueryType(trimmedMessage)
+    
     // Check for combo request
     const wantCombo = (lowerMsg.includes('makan') && lowerMsg.includes('minum')) ||
                       lowerMsg.includes('paket') || lowerMsg.includes('combo') ||
@@ -570,15 +721,9 @@ export async function POST(req: NextRequest) {
     
     if (wantCombo && budget) {
       // For combo, find the best combos and return as combo packages
-      const makananList = workingMenus.filter(m => {
-        const kategoriStr = m.kategori_menu?.join(' ').toLowerCase() || ''
-        return kategoriStr.includes('makan') && !kategoriStr.includes('minuman')
-      })
+      const makananList = workingMenus.filter(isMakanan)
       
-      const minumanList = workingMenus.filter(m => {
-        const kategoriStr = m.kategori_menu?.join(' ').toLowerCase() || ''
-        return kategoriStr.includes('minuman')
-      })
+      const minumanList = workingMenus.filter(isMinuman)
       
       // Find valid combos within budget
       const combos: { makanan: any; minuman: any; total: number; sisa: number }[] = []
@@ -611,27 +756,49 @@ export async function POST(req: NextRequest) {
       
       console.log(`[Chat] Returning ${comboData.length} combo packages`)
     } else if (!wantCombo) {
+      // Filter menus based on query type
+      let filteredMenus = workingMenus
+      
+      // Filter by makanan/minuman first
+      if (queryType.isMakananQuery) {
+        filteredMenus = filteredMenus.filter(isMakanan)
+        console.log('[Chat] Filtered to makanan:', filteredMenus.length)
+      } else if (queryType.isMinumanQuery) {
+        filteredMenus = filteredMenus.filter(isMinuman)
+        console.log('[Chat] Filtered to minuman:', filteredMenus.length)
+      }
+      
+      // Sort by price if termurah or termahal
+      if (queryType.isTermurah) {
+        filteredMenus = [...filteredMenus].sort((a, b) => a.harga - b.harga)
+        console.log('[Chat] Sorted by cheapest')
+      } else if (queryType.isTermahal) {
+        filteredMenus = [...filteredMenus].sort((a, b) => b.harga - a.harga)
+        console.log('[Chat] Sorted by most expensive')
+      }
+      
+      // Apply budget filter if specified
+      if (budget) {
+        filteredMenus = filteredMenus.filter(m => m.harga <= budget)
+      }
+      
       // Extract menu yang disebutkan di response AI
-      // Ini memastikan menu cards sesuai dengan yang dibahas
-      const mentionedMenus = extractMenuSuggestions(reply, workingMenus)
+      const mentionedMenus = extractMenuSuggestions(reply, filteredMenus)
       
       if (mentionedMenus.length > 0) {
         // Gunakan menu yang disebutkan di response
         menuData = mentionedMenus
+      } else if (filteredMenus.length > 0) {
+        // Use filtered menus (already filtered by query type)
+        menuData = filteredMenus.slice(0, 5)
       } else {
         // Fallback: filter berdasarkan kategori yang diminta user
         if (lowerMsg.includes('minum') || lowerMsg.includes('minuman') || lowerMsg.includes('es') || lowerMsg.includes('jus')) {
-          menuData = workingMenus.filter(m => 
-            m.kategori_menu?.some((k: string) => k.toLowerCase().includes('minuman'))
-          )
+          menuData = workingMenus.filter(isMinuman)
           if (budget) menuData = menuData.filter(m => m.harga <= budget)
           menuData = menuData.slice(0, 5)
         } else if (lowerMsg.includes('makan') || lowerMsg.includes('makanan') || lowerMsg.includes('nasi') || lowerMsg.includes('goreng')) {
-          menuData = workingMenus.filter(m => 
-            m.kategori_menu?.some((k: string) => 
-              k.toLowerCase().includes('makan') && !k.toLowerCase().includes('minuman')
-            )
-          )
+          menuData = workingMenus.filter(isMakanan)
           if (budget) menuData = menuData.filter(m => m.harga <= budget)
           menuData = menuData.slice(0, 5)
         } else if (lowerMsg.includes('snack') || lowerMsg.includes('jajan') || lowerMsg.includes('cemilan')) {
