@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import KantinList from '@/components/KantinList'
 import SearchBar from '@/components/SearchBar'
 import MealFilter, { type MealTime } from '@/components/MealFilter'
@@ -22,6 +22,7 @@ function SearchParamsGate({ onNeedTable }: { onNeedTable: () => void }) {
 }
 
 export default function Home() {
+  const router = useRouter()
   const [kantins, setKantins] = useState<KantinWithRating[]>([])
   const [filteredKantins, setFilteredKantins] = useState<KantinWithRating[]>([])
   const [menus, setMenus] = useState<Menu[]>([])
@@ -30,6 +31,17 @@ export default function Home() {
   const [mealFilter, setMealFilter] = useState<MealTime>('')
   const [tableNumber, setTableNumber] = useState('')
   const [showTableModal, setShowTableModal] = useState(false)
+
+  // Handle OAuth callback with hash fragment (if Supabase redirects directly to home)
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash && (hash.includes('access_token') || hash.includes('error'))) {
+      // Redirect to callback page to handle properly
+      const currentPath = window.location.pathname
+      router.replace(`/auth/callback?next=${encodeURIComponent(currentPath)}`)
+      return
+    }
+  }, [router])
 
   useEffect(() => {
     fetchData()
