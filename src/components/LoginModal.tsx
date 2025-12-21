@@ -53,16 +53,18 @@ export default function LoginModal({
     setError(null)
 
     try {
-      // Get current origin and pathname - ensure we're using the correct origin
+      // Get current origin and pathname
       const currentOrigin = window.location.origin
       const currentPathname = window.location.pathname
       
-      // Validate origin - must be user app, not admin
-      const isUserApp = currentOrigin.includes('localhost') || 
-                       currentOrigin.includes('qmeal') ||
-                       currentOrigin.includes('127.0.0.1')
+      // STRICT allowlist - exact match only, no includes() to prevent false positives
+      const ALLOWED_ORIGINS = [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'https://qmeal.up.railway.app',
+      ]
       
-      if (!isUserApp) {
+      if (!ALLOWED_ORIGINS.includes(currentOrigin)) {
         setError('Login hanya tersedia di aplikasi user, bukan admin')
         setIsLoading(false)
         return
@@ -71,31 +73,20 @@ export default function LoginModal({
       // Save intent to proceed to checkout after login
       if (onLoginSuccess) {
         sessionStorage.setItem('login-intent', 'checkout')
-        // Also save the origin to ensure we redirect back to the same domain
         sessionStorage.setItem('login-origin', currentOrigin)
       }
 
-      // Determine redirect URL - use base URL only (no query params)
-      // Supabase validates redirectTo against Redirect URLs list
-      // Query params will be preserved by Supabase and passed to callback
-      let redirectTo: string
-      if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
-        // Development: use localhost base URL only
-        redirectTo = 'http://localhost:3000/auth/callback'
-      } else {
-        // Production: always use production URL (hardcoded, base URL only)
-        // MUST match exactly with Supabase Dashboard → Redirect URLs
-        redirectTo = 'https://qmeal.up.railway.app/auth/callback'
-      }
+      // Build redirectTo with next parameter
+      // Base URL determined by current origin
+      const base = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')
+        ? 'http://localhost:3000'
+        : 'https://qmeal.up.railway.app'
       
-      // Store the next path in sessionStorage to retrieve after redirect
-      if (currentPathname && currentPathname !== '/') {
-        sessionStorage.setItem('login-redirect-path', currentPathname)
-      }
+      const redirectTo = `${base}/auth/callback?next=${encodeURIComponent(currentPathname || '/')}`
       
-      console.log('[LoginModal] OAuth redirect to:', redirectTo) // Debug log
-      console.log('[LoginModal] Current origin:', currentOrigin) // Debug log
-      console.log('[LoginModal] Current pathname:', currentPathname) // Debug log
+      console.log('[LoginModal] OAuth redirect to:', redirectTo)
+      console.log('[LoginModal] Current origin:', currentOrigin)
+      console.log('[LoginModal] Current pathname:', currentPathname)
 
       // Set a timeout to reset loading state if redirect doesn't happen
       const loadingTimeout = setTimeout(() => {
