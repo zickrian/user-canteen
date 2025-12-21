@@ -100,21 +100,23 @@ export default function KantinDetailPage() {
           setFilteredMenus(menusData || [])
         }
 
-        if (process.env.NEXT_PUBLIC_ENABLE_RATING === 'true') {
-          try {
-            const { data: ratingData } = await supabase
-              .rpc('get_kantin_rating', { p_kantin_id: kantinId })
+        // Always fetch rating (no need for env check)
+        try {
+          const { data: ratingData, error: ratingError } = await supabase
+            .rpc('get_kantin_rating', { p_kantin_id: kantinId })
 
-            if (ratingData && ratingData.length > 0) {
-              setKantin(prev => prev ? {
-                ...prev,
-                avg_rating: ratingData[0].avg_rating,
-                total_ratings: ratingData[0].total_ratings
-              } : null)
-            }
-          } catch (ratingError) {
-            console.log('Rating function not available:', ratingError)
+          if (!ratingError && ratingData && ratingData.length > 0) {
+            const avgRating = Number(ratingData[0].avg_rating) || 0
+            const totalRatings = Number(ratingData[0].total_ratings) || 0
+            
+            setKantin(prev => prev ? {
+              ...prev,
+              avg_rating: avgRating,
+              total_ratings: totalRatings
+            } : null)
           }
+        } catch (ratingError) {
+          console.log('Rating function not available:', ratingError)
         }
 
       } catch (error) {
@@ -197,11 +199,14 @@ export default function KantinDetailPage() {
     router.push('/checkout')
   }
 
-  const renderStars = (rating: number) => {
+  const renderStars = (rating: number, totalRatings: number) => {
     return (
-      <div className="flex gap-0.5">
+      <div className="flex items-center gap-1">
         <Star className="h-4 w-4 fill-orange-400 text-orange-400" />
-        <span className="font-semibold text-sm ml-1 text-zinc-900">{rating.toFixed(1)}</span>
+        <span className="font-semibold text-sm text-zinc-900">{rating.toFixed(1)}/5</span>
+        {totalRatings > 0 && (
+          <span className="text-zinc-400 ml-1 text-xs">({totalRatings})</span>
+        )}
       </div>
     )
   }
@@ -307,10 +312,9 @@ export default function KantinDetailPage() {
                     <span className="text-[10px] sm:text-xs">{kantin.jam_buka} - {kantin.jam_tutup}</span>
                   </div>
                 )}
-                {(kantin as any).avg_rating > 0 && (
+                {(kantin as any).avg_rating > 0 && (kantin as any).total_ratings > 0 && (
                   <div className="flex items-center bg-orange-50 px-2 py-1 rounded-lg">
-                    {renderStars((kantin as any).avg_rating)}
-                    <span className="text-zinc-400 ml-1 text-[10px] sm:text-xs">({(kantin as any).total_ratings})</span>
+                    {renderStars((kantin as any).avg_rating, (kantin as any).total_ratings)}
                   </div>
                 )}
               </div>
@@ -321,20 +325,20 @@ export default function KantinDetailPage() {
           <div className="mt-4 sm:mt-6 flex items-center gap-2 sm:gap-3 border-t border-zinc-100 pt-4 sm:pt-5">
             <button
               onClick={() => setShowTableModal(true)}
-              className="flex-1 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl transition-colors text-left group min-w-0"
+              className="flex-1 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl transition-all text-left group min-w-0 shadow-sm hover:shadow-md hover:shadow-orange-100 active:shadow-sm active:scale-[0.99]"
             >
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white border border-zinc-200 flex items-center justify-center shrink-0 group-hover:border-orange-200 group-hover:bg-orange-50 transition-colors">
-                <span className="font-bold text-base sm:text-lg text-zinc-900 group-hover:text-orange-600">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-orange-500 border-2 border-orange-400 flex items-center justify-center shrink-0 group-hover:bg-orange-600 group-hover:border-orange-500 transition-colors shadow-sm">
+                <span className="font-bold text-base sm:text-lg text-white">
                   {tableNumber || '?'}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] sm:text-xs text-zinc-500 font-medium uppercase tracking-wider">No. Meja</p>
-                <p className="text-xs sm:text-sm font-semibold text-zinc-900 truncate">
+                <p className="text-[10px] sm:text-xs text-orange-600/70 font-medium uppercase tracking-wider">No. Meja</p>
+                <p className="text-xs sm:text-sm font-semibold text-orange-900 truncate">
                   {tableNumber ? 'Edit Meja' : 'Pilih Meja'}
                 </p>
               </div>
-              <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-zinc-400 shrink-0" />
+              <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-500 group-hover:text-orange-600 shrink-0 transition-colors" />
             </button>
 
             <button

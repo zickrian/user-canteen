@@ -10,13 +10,18 @@ interface KantinCardProps {
 }
 
 export default function KantinCard({ kantin }: KantinCardProps) {
-  const renderStars = (rating: number) => {
+  const renderStars = (rating: number, totalRatings: number) => {
     return (
-      <div className="flex gap-0.5">
+      <div className="flex items-center gap-1">
         <Star className="h-3.5 w-3.5 fill-orange-400 text-orange-400" />
-        <span className="text-xs font-bold text-zinc-700 ml-1">
-          {rating.toFixed(1)} <span className="text-zinc-400 font-normal">({kantin.total_ratings})</span>
+        <span className="text-xs font-bold text-zinc-700">
+          {rating.toFixed(1)}/5
         </span>
+        {totalRatings > 0 && (
+          <span className="text-[10px] text-zinc-400 font-normal">
+            ({totalRatings})
+          </span>
+        )}
       </div>
     )
   }
@@ -62,7 +67,7 @@ export default function KantinCard({ kantin }: KantinCardProps) {
         <div className="flex items-center justify-between gap-2">
           {/* Rating */}
           {(kantin.avg_rating && kantin.total_ratings && kantin.total_ratings > 0) ? (
-            renderStars(kantin.avg_rating)
+            renderStars(kantin.avg_rating, kantin.total_ratings)
           ) : (
             <span className="text-[10px] sm:text-xs text-zinc-400">Belum ada rating</span>
           )}

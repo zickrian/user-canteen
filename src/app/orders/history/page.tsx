@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Package, Clock, CheckCircle, Receipt, Store } from 'lucide-react'
+import { ArrowLeft, Package, Clock, CheckCircle, Receipt, Store, Star } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
+import RatingModal from '@/components/RatingModal'
+import type { Kantin } from '@/lib/supabase'
 
 interface OrderWithDetails {
   id: string
@@ -22,6 +24,8 @@ interface OrderWithDetails {
   status: string
   payment_method: string | null
   created_at: string
+  hasRating?: boolean
+  userRating?: number
 }
 
 export default function OrderHistoryPage() {
@@ -30,6 +34,9 @@ export default function OrderHistoryPage() {
   const [orders, setOrders] = useState<OrderWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showRatingModal, setShowRatingModal] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null)
+  const [selectedKantin, setSelectedKantin] = useState<Kantin | null>(null)
 
   useEffect(() => {
     if (!authLoading) {
@@ -66,13 +73,83 @@ export default function OrderHistoryPage() {
       }
 
       const data = await response.json()
-      setOrders(data.orders || [])
+      const ordersData = data.orders || []
+
+      // Fetch ratings for completed orders
+      if (ordersData.length > 0 && user) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          const completedOrderIds = ordersData
+            .filter((o: OrderWithDetails) => o.status === 'selesai')
+            .map((o: OrderWithDetails) => o.id)
+
+          if (completedOrderIds.length > 0) {
+            const ratingPromises = completedOrderIds.map(async (orderId: string) => {
+              try {
+                const ratingResponse = await fetch(`/api/rating/kantin?pesanan_id=${orderId}`, {
+                  headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                  },
+                })
+                const ratingData = await ratingResponse.json()
+                return { orderId, rating: ratingData.rating }
+              } catch (err) {
+                return { orderId, rating: null }
+              }
+            })
+
+            const ratingResults = await Promise.all(ratingPromises)
+            const ratingMap = new Map(
+              ratingResults.map((r) => [r.orderId, r.rating])
+            )
+
+            // Add rating info to orders
+            ordersData.forEach((order: OrderWithDetails) => {
+              const rating = ratingMap.get(order.id)
+              order.hasRating = !!rating
+              order.userRating = rating?.rating || undefined
+            })
+          }
+        }
+      }
+
+      setOrders(ordersData)
     } catch (err) {
       console.error('Error fetching orders:', err)
       setError('Gagal memuat history pesanan')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleOpenRating = async (order: OrderWithDetails) => {
+    if (!order.kantin) return
+
+    // Fetch kantin details
+    try {
+      const { data: kantinData, error } = await supabase
+        .from('kantin')
+        .select('*')
+        .eq('id', order.kantin.id)
+        .single()
+
+      if (error || !kantinData) {
+        setError('Gagal memuat data kantin')
+        return
+      }
+
+      setSelectedKantin(kantinData as Kantin)
+      setSelectedOrder(order)
+      setShowRatingModal(true)
+    } catch (err) {
+      console.error('Error fetching kantin:', err)
+      setError('Gagal memuat data kantin')
+    }
+  }
+
+  const handleRatingSubmitted = () => {
+    // Refresh orders to show updated rating status
+    fetchOrders()
   }
 
   const getStatusBadge = (status: string) => {
@@ -267,12 +344,57 @@ export default function OrderHistoryPage() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Rating Button - Only show for completed orders */}
+                  {order.status === 'selesai' && order.kantin && (
+                    <div className="pt-4 border-t border-zinc-100">
+                      {order.hasRating ? (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Star className="h-4 w-4 fill-orange-400 text-orange-400" />
+                            <span className="text-sm font-semibold text-zinc-700">
+                              Anda sudah memberikan rating: {order.userRating}/5
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleOpenRating(order)}
+                            className="px-4 py-2 text-xs font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors border border-orange-200"
+                          >
+                            Ubah Rating
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleOpenRating(order)}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition-all active:scale-95 shadow-sm shadow-orange-200"
+                        >
+                          <Star className="h-4 w-4 fill-white" />
+                          Berikan Rating
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Rating Modal */}
+      {showRatingModal && selectedOrder && selectedKantin && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => {
+            setShowRatingModal(false)
+            setSelectedOrder(null)
+            setSelectedKantin(null)
+          }}
+          kantin={selectedKantin}
+          pesananId={selectedOrder.id}
+          onRatingSubmitted={handleRatingSubmitted}
+        />
+      )}
     </div>
   )
 }

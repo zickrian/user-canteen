@@ -89,16 +89,52 @@ export default function Home() {
 
       if (menusError) throw menusError
 
-      // Format kantins data
-      const kantinsWithRating = kantinsData.map(kantin => {
-        return {
-          ...kantin,
-          avg_rating: 0,
-          total_ratings: 0,
-          total_menus: kantin.menu?.length || 0,
-          menus: kantin.menu
-        }
-      })
+      // Fetch ratings for all kantins
+      const kantinsWithRating = await Promise.all(
+        kantinsData.map(async (kantin) => {
+          try {
+            // Fetch rating using RPC function
+            const { data: ratingData, error: ratingError } = await supabase
+              .rpc('get_kantin_rating', { p_kantin_id: kantin.id })
+
+            let avg_rating = 0
+            let total_ratings = 0
+
+            if (!ratingError && ratingData && ratingData.length > 0) {
+              // Ensure proper conversion from NUMERIC to number
+              // NUMERIC(3,2) returns as string, convert to number
+              const avgRatingValue = ratingData[0].avg_rating
+              const totalRatingsValue = ratingData[0].total_ratings
+              
+              avg_rating = avgRatingValue != null ? Number(avgRatingValue) : 0
+              total_ratings = totalRatingsValue != null ? Number(totalRatingsValue) : 0
+              
+              // Validate: rating should be between 0 and 5
+              if (avg_rating < 0 || avg_rating > 5) {
+                console.warn(`Invalid avg_rating for kantin ${kantin.id}: ${avg_rating}`)
+                avg_rating = 0
+              }
+            }
+
+            return {
+              ...kantin,
+              avg_rating,
+              total_ratings,
+              total_menus: kantin.menu?.length || 0,
+              menus: kantin.menu
+            }
+          } catch (error) {
+            console.error(`Error fetching rating for kantin ${kantin.id}:`, error)
+            return {
+              ...kantin,
+              avg_rating: 0,
+              total_ratings: 0,
+              total_menus: kantin.menu?.length || 0,
+              menus: kantin.menu
+            }
+          }
+        })
+      )
 
       setKantins(kantinsWithRating)
       setMenus(menusData || [])
