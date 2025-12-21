@@ -7,16 +7,6 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code')
   const next = requestUrl.searchParams.get('next') || '/'
 
-  // Priority order for determining origin:
-  // 1. Use request URL origin (most reliable - callback URL itself shows the correct domain)
-  // 2. Check if callback is from localhost (development)
-  // 3. Check referer header
-  // 4. Check origin header
-  // 5. Fallback to production URL
-  
-  const referer = request.headers.get('referer')
-  const origin = request.headers.get('origin')
-  
   // Validate origin - only allow user app origins (localhost or qmeal)
   const allowedUserAppOrigins = [
     'http://localhost:3000',
@@ -25,45 +15,61 @@ export async function GET(request: NextRequest) {
     'https://qmeal.vercel.app'
   ]
   
-  // Check if this callback is being called from localhost
-  const isLocalhostCallback = requestUrl.hostname === 'localhost' || 
-                               requestUrl.hostname === '127.0.0.1' ||
-                               referer?.includes('localhost:3000') ||
-                               referer?.includes('127.0.0.1:3000')
-  
-  // Determine safe origin - prioritize request URL origin (most reliable)
+  // Determine safe origin based on request URL (most reliable)
+  // If callback is called from production URL, use production URL
+  // If callback is called from localhost, use localhost
   let safeOrigin: string
   
-  // First, check if request URL origin is in allowed list (most reliable)
+  // Check request URL hostname to determine environment
+  const isProduction = requestUrl.hostname === 'qmeal.up.railway.app' || 
+                        requestUrl.hostname === 'qmeal.vercel.app'
+  const isLocalhost = requestUrl.hostname === 'localhost' || 
+                      requestUrl.hostname === '127.0.0.1'
+  
+  // Use request URL origin if it's in allowed list (most reliable)
   if (allowedUserAppOrigins.includes(requestUrl.origin)) {
     safeOrigin = requestUrl.origin
-  } else if (isLocalhostCallback) {
-    // Force localhost for development
+  } else if (isProduction) {
+    // Force production URL if we're in production
+    safeOrigin = 'https://qmeal.up.railway.app'
+  } else if (isLocalhost) {
+    // Force localhost if we're in development
     safeOrigin = 'http://localhost:3000'
-  } else if (referer) {
-    // Extract origin from referer
-    try {
-      const refererUrl = new URL(referer)
-      if (allowedUserAppOrigins.includes(refererUrl.origin)) {
-        safeOrigin = refererUrl.origin
-      } else {
+  } else {
+    // Fallback: check referer or origin headers
+    const referer = request.headers.get('referer')
+    const origin = request.headers.get('origin')
+    
+    if (referer) {
+      try {
+        const refererUrl = new URL(referer)
+        if (allowedUserAppOrigins.includes(refererUrl.origin)) {
+          safeOrigin = refererUrl.origin
+        } else {
+          safeOrigin = 'https://qmeal.up.railway.app'
+        }
+      } catch {
         safeOrigin = 'https://qmeal.up.railway.app'
       }
-    } catch {
+    } else if (origin && allowedUserAppOrigins.includes(origin)) {
+      safeOrigin = origin
+    } else {
+      // Default to production
       safeOrigin = 'https://qmeal.up.railway.app'
     }
-  } else if (origin && allowedUserAppOrigins.includes(origin)) {
-    safeOrigin = origin
-  } else {
-    // Default to production URL for production, localhost for development
-    safeOrigin = isLocalhostCallback ? 'http://localhost:3000' : 'https://qmeal.up.railway.app'
   }
   
   // Final validation - ensure we only redirect to user app
   if (!allowedUserAppOrigins.includes(safeOrigin)) {
-    // Default to localhost for development, or qmeal for production
-    safeOrigin = isLocalhostCallback ? 'http://localhost:3000' : 'https://qmeal.up.railway.app'
+    // Default based on environment
+    safeOrigin = isLocalhost ? 'http://localhost:3000' : 'https://qmeal.up.railway.app'
   }
+  
+  // Debug logging
+  console.log('[Auth Callback] Request URL:', requestUrl.toString())
+  console.log('[Auth Callback] Request hostname:', requestUrl.hostname)
+  console.log('[Auth Callback] Safe origin:', safeOrigin)
+  console.log('[Auth Callback] Next param:', next)
 
   if (code) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
