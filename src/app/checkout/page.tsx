@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/contexts/CartContext'
+import { useAuth } from '@/hooks/useAuth'
+import { supabase } from '@/lib/supabase'
 import { CheckoutForm, CartItem, Kantin } from '@/lib/supabase'
 import { ArrowLeft, Plus, Minus, Trash2, Clock, User, Mail, Table, QrCode, Store } from 'lucide-react'
 
@@ -121,6 +123,51 @@ export default function CheckoutPage() {
       if (interval) clearInterval(interval)
     }
   }, [showQR, paymentStatus, midtransOrderId])
+
+  // Auto-fill email and name from user profile when user is logged in
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!user) return
+
+      try {
+        // Fetch user profile from database
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('full_name, email')
+          .eq('id', user.id)
+          .single()
+
+        if (error && error.code !== 'PGRST116') {
+          // PGRST116 = no rows returned, which is okay
+          console.error('Error fetching user profile:', error)
+        }
+
+        // Set form data with user information
+        setFormData(prev => ({
+          ...prev,
+          email: profile?.email || user.email || prev.email,
+          nama_pelanggan: profile?.full_name || 
+                         user.user_metadata?.full_name || 
+                         user.user_metadata?.name || 
+                         prev.nama_pelanggan
+        }))
+      } catch (err) {
+        console.error('Error loading user data:', err)
+        // Fallback to user metadata if profile fetch fails
+        if (user.email) {
+          setFormData(prev => ({
+            ...prev,
+            email: user.email || prev.email,
+            nama_pelanggan: user.user_metadata?.full_name || 
+                           user.user_metadata?.name || 
+                           prev.nama_pelanggan
+          }))
+        }
+      }
+    }
+
+    loadUserData()
+  }, [user])
 
   useEffect(() => {
     const globalKey = 'table-number'
