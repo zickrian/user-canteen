@@ -92,25 +92,44 @@ export default function SettingsPage() {
       setError(null)
       setSuccess(false)
 
+      // Validate phone number format (optional, but if provided should be valid)
+      const phoneRegex = /^[0-9+\-\s()]*$/
+      if (formData.phone && formData.phone.trim() && !phoneRegex.test(formData.phone)) {
+        setError('Format nomor telepon tidak valid')
+        setSaving(false)
+        return
+      }
+
+      // Prepare update data
+      const updateData: {
+        full_name: string | null
+        phone: string | null
+        updated_at: string
+      } = {
+        full_name: formData.full_name.trim() || null,
+        phone: formData.phone.trim() || null,
+        updated_at: new Date().toISOString(),
+      }
+
       const { error: updateError } = await supabase
         .from('user_profiles')
-        .update({
-          full_name: formData.full_name,
-          phone: formData.phone,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', user.id)
 
-      if (updateError) throw updateError
+      if (updateError) {
+        console.error('Update error:', updateError)
+        throw updateError
+      }
 
       setSuccess(true)
       await fetchProfile() // Refresh profile
 
       // Hide success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating profile:', err)
-      setError('Gagal menyimpan perubahan')
+      const errorMessage = err?.message || 'Gagal menyimpan perubahan'
+      setError(errorMessage)
     } finally {
       setSaving(false)
     }
