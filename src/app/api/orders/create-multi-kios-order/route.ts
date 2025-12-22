@@ -197,7 +197,8 @@ export async function POST(request: NextRequest) {
           email: customerDetails.email || 'customer@example.com',
           phone: customerDetails.nomor_meja || '-'
         },
-        enabled_payments: ['qris']
+        // Menggunakan GoPay agar QR dari GoPay langsung muncul di Snap
+        enabled_payments: ['gopay']
       })
 
       return NextResponse.json({

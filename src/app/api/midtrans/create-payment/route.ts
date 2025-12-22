@@ -74,7 +74,8 @@ export async function POST(request: NextRequest) {
       transaction_details: transactionDetails,
       item_details: itemDetails,
       customer_details: customerDetails,
-      enabled_payments: ['qris']
+      // Menggunakan GoPay (yang di dalamnya ada QR/QRIS GoPay) sesuai requirement
+      enabled_payments: ['gopay']
     })
 
     // Save order to database (pesanan table) dengan semua data yang diperlukan

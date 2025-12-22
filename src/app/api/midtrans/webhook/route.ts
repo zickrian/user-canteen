@@ -36,7 +36,50 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update payment status
+    const pesananIds = payments.map(p => p.pesanan_id)
+
+    // Kalau transaksi dibatalkan / expire / ditolak:
+    // - hapus pembayaran
+    // - hapus detail_pesanan
+    // - hapus pesanan
+    // Sehingga tidak muncul di history maupun pemesanan kios.
+    if (
+      transaction_status === 'cancel' ||
+      transaction_status === 'expire' ||
+      transaction_status === 'deny'
+    ) {
+      // Hapus detail_pesanan terlebih dahulu (FK ke pesanan)
+      const { error: detailDeleteError } = await supabaseAdmin
+        .from('detail_pesanan')
+        .delete()
+        .in('pesanan_id', pesananIds)
+
+      if (detailDeleteError) {
+        console.error('Error deleting detail_pesanan for canceled transaction:', detailDeleteError)
+      }
+
+      const { error: pesananDeleteError } = await supabaseAdmin
+        .from('pesanan')
+        .delete()
+        .in('id', pesananIds)
+
+      if (pesananDeleteError) {
+        console.error('Error deleting pesanan for canceled transaction:', pesananDeleteError)
+      }
+
+      const { error: pembayaranDeleteError } = await supabaseAdmin
+        .from('pembayaran')
+        .delete()
+        .eq('midtrans_order_id', order_id)
+
+      if (pembayaranDeleteError) {
+        console.error('Error deleting pembayaran for canceled transaction:', pembayaranDeleteError)
+      }
+
+      return NextResponse.json({ success: true })
+    }
+
+    // Selain dibatalkan (settlement / capture / pending), update status pembayaran & pesanan
     let paymentStatus = 'pending'
     if (transaction_status === 'settlement') {
       paymentStatus = 'settlement'
@@ -61,7 +104,7 @@ export async function POST(request: NextRequest) {
       console.error('Error updating payment record:', paymentUpdateError)
     }
 
-    // Update order status in database for all related pesanan
+    // Update order status di tabel pesanan
     let newStatus = 'menunggu'
     
     if (transaction_status === 'capture') {
@@ -73,12 +116,11 @@ export async function POST(request: NextRequest) {
     } else if (transaction_status === 'settlement') {
       newStatus = 'diproses'
     } else if (transaction_status === 'cancel' || transaction_status === 'deny' || transaction_status === 'expire') {
-      newStatus = 'menunggu' // Or you could add a 'dibatalkan' status
+      newStatus = 'menunggu'
     } else if (transaction_status === 'pending') {
       newStatus = 'menunggu'
     }
 
-    const pesananIds = payments.map(p => p.pesanan_id)
     const { error: pesananUpdateError } = await supabaseAdmin
       .from('pesanan')
       .update({ 
