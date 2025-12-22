@@ -9,6 +9,21 @@ import { supabase } from '@/lib/supabase'
 import RatingModal from '@/components/RatingModal'
 import type { Kantin } from '@/lib/supabase'
 
+interface OrderItem {
+  id: string
+  pesanan_id: string
+  menu_id: string
+  jumlah: number
+  harga_satuan: number
+  subtotal: number
+  menu?: {
+    id: string
+    nama_menu: string
+    harga: number
+    foto_menu?: string | null
+  } | null
+}
+
 interface OrderWithDetails {
   id: string
   kantin?: {
@@ -26,6 +41,7 @@ interface OrderWithDetails {
   status: string
   payment_method: string | null
   created_at: string
+  items?: OrderItem[]
   hasRating?: boolean
   userRating?: number
 }
@@ -335,6 +351,41 @@ export default function OrderHistoryPage() {
                       <p className="text-lg font-bold text-orange-600">{formatCurrency(order.total_harga)}</p>
                     </div>
                   </div>
+
+                  {/* Menu Items */}
+                  {order.items && order.items.length > 0 && (
+                    <div className="pt-4 border-t border-dashed border-zinc-200">
+                      <span className="text-xs text-zinc-400 uppercase tracking-wider font-semibold block mb-3">Menu yang Dipesan</span>
+                      <div className="space-y-2">
+                        {order.items.map((item) => (
+                          <div key={item.id} className="flex items-start gap-3 p-2 bg-zinc-50 rounded-lg">
+                            {item.menu?.foto_menu && (
+                              <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-zinc-200">
+                                <Image
+                                  src={item.menu.foto_menu}
+                                  alt={item.menu.nama_menu || 'Menu'}
+                                  width={48}
+                                  height={48}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-zinc-900">{item.menu?.nama_menu || 'Menu tidak ditemukan'}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs text-zinc-500">
+                                  {item.jumlah} × {formatCurrency(item.harga_satuan)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-bold text-zinc-900">{formatCurrency(item.subtotal)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4 pt-4 border-t border-dashed border-zinc-200">
                     <div>

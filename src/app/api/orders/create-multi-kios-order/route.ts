@@ -59,13 +59,16 @@ export async function POST(request: NextRequest) {
         const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId)
         if (!authError && authUser?.user) {
           validUserId = userId
+          console.log(`Valid userId: ${userId}`)
         } else {
-          console.warn(`Invalid userId provided: ${userId}, will set to null`)
+          console.warn(`Invalid userId provided: ${userId}, error: ${authError?.message || 'User not found'}, will set to null`)
         }
       } catch (error) {
         console.warn(`Error validating userId ${userId}:`, error)
         // If validation fails, set to null to avoid FK constraint violation
       }
+    } else {
+      console.log('No userId provided, will set user_id to null')
     }
 
     const createdOrders: { pesananId: string; kantinId: string; kantinName: string; subtotal: number }[] = []

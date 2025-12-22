@@ -40,8 +40,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Fetch orders for this user - hanya field yang diperlukan untuk history
-    const { data: orders, error: ordersError } = await supabase
+    // Fetch orders for this user - include both user_id match and email match (for orders with null user_id)
+    // This handles cases where orders were created with user_id = null but email matches
+    // We'll fetch orders by user_id first, then also fetch orders by email if user_id is null
+    const { data: ordersByUserId, error: ordersByUserIdError } = await supabase
       .from('pesanan')
       .select(`
         id,
@@ -55,10 +57,52 @@ export async function GET(request: NextRequest) {
         total_harga,
         status,
         payment_method,
+        user_id,
         created_at
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
+
+    // Also fetch orders by email if user_id is null (for guest checkout that matches user email)
+    const { data: ordersByEmail, error: ordersByEmailError } = await supabase
+      .from('pesanan')
+      .select(`
+        id,
+        kantin_id,
+        nomor_antrian,
+        nama_pemesan,
+        email,
+        nomor_meja,
+        tipe_pesanan,
+        catatan,
+        total_harga,
+        status,
+        payment_method,
+        user_id,
+        created_at
+      `)
+      .is('user_id', null)
+      .eq('email', user.email || '')
+      .order('created_at', { ascending: false })
+
+    // Combine both results and remove duplicates
+    const allOrders = [
+      ...(ordersByUserId || []),
+      ...(ordersByEmail || [])
+    ]
+    
+    // Remove duplicates by id
+    const uniqueOrders = Array.from(
+      new Map(allOrders.map((order: any) => [order.id, order])).values()
+    )
+
+    // Sort by created_at descending
+    uniqueOrders.sort((a: any, b: any) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+
+    const orders = uniqueOrders
+    const ordersError = ordersByUserIdError || ordersByEmailError
 
     if (ordersError) {
       console.error('Error fetching orders:', ordersError)
@@ -120,7 +164,39 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Map orders dengan nama kantin dan payment method
+    // Fetch detail pesanan (menu items) for all orders
+    const orderIds = orders.map((o: any) => o.id)
+    const { data: detailPesananRaw } = await supabase
+      .from('detail_pesanan')
+      .select('*')
+      .in('pesanan_id', orderIds)
+
+    // Fetch menu info for all menu_ids
+    const menuIds = [...new Set((detailPesananRaw || []).map((d: any) => d.menu_id))]
+    const { data: menus } = menuIds.length > 0 ? await supabase
+      .from('menu')
+      .select('id, nama_menu, harga, foto_menu')
+      .in('id', menuIds) : { data: [] }
+
+    const menuMap = new Map((menus || []).map((m: any) => [m.id, m]))
+
+    // Group detail pesanan by pesanan_id
+    const detailPesananByOrderId = new Map<string, any[]>()
+    if (detailPesananRaw) {
+      detailPesananRaw.forEach((detail: any) => {
+        const menu = menuMap.get(detail.menu_id) || null
+        const detailWithMenu = {
+          ...detail,
+          menu: menu
+        }
+        if (!detailPesananByOrderId.has(detail.pesanan_id)) {
+          detailPesananByOrderId.set(detail.pesanan_id, [])
+        }
+        detailPesananByOrderId.get(detail.pesanan_id)!.push(detailWithMenu)
+      })
+    }
+
+    // Map orders dengan nama kantin, payment method, dan detail menu
     const ordersWithDetails = orders.map((order: any) => {
       // Get payment method dari payment_method field atau dari tabel pembayaran
       let paymentMethod = order.payment_method || paymentMethodMap.get(order.id) || null
@@ -138,6 +214,7 @@ export async function GET(request: NextRequest) {
         status: order.status,
         payment_method: paymentMethod,
         created_at: order.created_at,
+        items: detailPesananByOrderId.get(order.id) || [],
       }
     })
 
