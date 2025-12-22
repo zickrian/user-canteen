@@ -21,6 +21,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate userId - check if user exists in auth.users
+    let validUserId: string | null = null
+    if (orderData.userId) {
+      try {
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(orderData.userId)
+        if (!authError && authUser?.user) {
+          validUserId = orderData.userId
+        } else {
+          console.warn(`Invalid userId provided: ${orderData.userId}, will set to null`)
+        }
+      } catch (error) {
+        console.warn(`Error validating userId ${orderData.userId}:`, error)
+        // If validation fails, set to null to avoid FK constraint violation
+      }
+    }
+
     // Generate unique order ID
     const pesananId = crypto.randomUUID()
 
@@ -50,10 +66,10 @@ export async function POST(request: NextRequest) {
         email: orderData.customerDetails.email || null,
         nomor_meja: orderData.customerDetails.nomor_meja || null,
         tipe_pesanan: orderData.customerDetails.tipe_pesanan || null,
-        total_harga: orderData.grossAmount,
-        status: 'menunggu',
-        user_id: orderData.userId || null,
-        payment_method: 'cash'
+          total_harga: orderData.grossAmount,
+          status: 'menunggu',
+          user_id: validUserId,
+          payment_method: 'cash'
       })
       .select()
       .single()

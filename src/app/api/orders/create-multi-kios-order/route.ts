@@ -52,6 +52,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate userId - check if user exists in auth.users
+    let validUserId: string | null = null
+    if (userId) {
+      try {
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId)
+        if (!authError && authUser?.user) {
+          validUserId = userId
+        } else {
+          console.warn(`Invalid userId provided: ${userId}, will set to null`)
+        }
+      } catch (error) {
+        console.warn(`Error validating userId ${userId}:`, error)
+        // If validation fails, set to null to avoid FK constraint violation
+      }
+    }
+
     const createdOrders: { pesananId: string; kantinId: string; kantinName: string; subtotal: number }[] = []
     const midtransOrderId = `MULTI-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
@@ -87,7 +103,7 @@ export async function POST(request: NextRequest) {
           tipe_pesanan: customerDetails.tipe_pesanan || null,
           total_harga: kiosOrder.subtotal,
           status: 'menunggu',
-          user_id: userId || null,
+          user_id: validUserId,
           payment_method: paymentMethod
         })
 
@@ -154,7 +170,7 @@ export async function POST(request: NextRequest) {
             email_pelanggan: customerDetails.email,
             nomor_meja: customerDetails.nomor_meja,
             tipe_pesanan: customerDetails.tipe_pesanan,
-            payer_id: userId || null
+            payer_id: validUserId
           })
 
         if (paymentError) {
