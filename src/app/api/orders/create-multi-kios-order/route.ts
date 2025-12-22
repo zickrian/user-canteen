@@ -52,6 +52,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate payment method - must be 'cash' or 'qris'
+    if (!paymentMethod || (paymentMethod !== 'cash' && paymentMethod !== 'qris')) {
+      return NextResponse.json(
+        { error: 'Metode pembayaran tidak valid. Harus cash atau qris' },
+        { status: 400 }
+      )
+    }
+
+    // Normalize payment method to match database constraint
+    // Database constraint allows: 'cash', 'qris', or 'midtrans'
+    // We map 'qris' to 'qris' (not 'midtrans') to match the constraint
+    const normalizedPaymentMethod: 'cash' | 'qris' = paymentMethod === 'cash' ? 'cash' : 'qris'
+
     // Validate userId - check if user exists in auth.users
     let validUserId: string | null = null
     if (userId) {
@@ -107,7 +120,7 @@ export async function POST(request: NextRequest) {
           total_harga: kiosOrder.subtotal,
           status: 'menunggu',
           user_id: validUserId,
-          payment_method: paymentMethod
+          payment_method: normalizedPaymentMethod
         })
 
       if (orderError) {
