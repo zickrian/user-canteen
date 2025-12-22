@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
           tipe_pesanan: customerDetails.tipe_pesanan || null,
           total_harga: kiosOrder.subtotal,
           status: 'menunggu',
-          user_id: userId || null
+          user_id: userId || null,
+          payment_method: paymentMethod
         })
 
       if (orderError) {

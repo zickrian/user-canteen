@@ -84,13 +84,46 @@ export async function GET(request: NextRequest) {
 
     const kantinMap = new Map((kantinList || []).map((k: any) => [k.id, k]))
 
+    // Get payment methods from payment tables for orders that don't have payment_method set
+    const orderIdsWithoutPaymentMethod = orders
+      .filter((o: any) => !o.payment_method)
+      .map((o: any) => o.id)
+
+    let paymentMethodMap = new Map<string, string>()
+
+    if (orderIdsWithoutPaymentMethod.length > 0) {
+      // Check pembayaran table (QRIS)
+      const { data: qrisPayments } = await supabase
+        .from('pembayaran')
+        .select('pesanan_id, payment_type')
+        .in('pesanan_id', orderIdsWithoutPaymentMethod)
+
+      if (qrisPayments) {
+        qrisPayments.forEach((p: any) => {
+          paymentMethodMap.set(p.pesanan_id, 'qris')
+        })
+      }
+
+      // Check pembayaran_cash table (Cash)
+      const { data: cashPayments } = await supabase
+        .from('pembayaran_cash')
+        .select('pesanan_id')
+        .in('pesanan_id', orderIdsWithoutPaymentMethod)
+
+      if (cashPayments) {
+        cashPayments.forEach((p: any) => {
+          // Only set if not already set from qrisPayments
+          if (!paymentMethodMap.has(p.pesanan_id)) {
+            paymentMethodMap.set(p.pesanan_id, 'cash')
+          }
+        })
+      }
+    }
+
     // Map orders dengan nama kantin dan payment method
     const ordersWithDetails = orders.map((order: any) => {
       // Get payment method dari payment_method field atau dari tabel pembayaran
-      let paymentMethod = order.payment_method || 'unknown'
-      
-      // Jika payment_method null, cek dari tabel pembayaran (tapi kita skip untuk performa)
-      // Karena sudah ada payment_method di tabel pesanan
+      let paymentMethod = order.payment_method || paymentMethodMap.get(order.id) || null
 
       return {
         id: order.id,

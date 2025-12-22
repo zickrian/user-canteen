@@ -52,7 +52,8 @@ export async function POST(request: NextRequest) {
         tipe_pesanan: orderData.customerDetails.tipe_pesanan || null,
         total_harga: orderData.grossAmount,
         status: 'menunggu',
-        user_id: orderData.userId || null
+        user_id: orderData.userId || null,
+        payment_method: 'cash'
       })
       .select()
       .single()
