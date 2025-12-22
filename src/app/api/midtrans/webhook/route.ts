@@ -5,45 +5,36 @@ import crypto from 'crypto'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text()
-    const signature = request.headers.get('x-callback-signature')
-    
-    if (!signature) {
-      return NextResponse.json(
-        { error: 'Signature not found' },
-        { status: 400 }
-      )
-    }
+    const notification = JSON.parse(body)
+    const { order_id, transaction_status, fraud_status, status_code, gross_amount, signature_key } = notification
 
-    // Verify signature
+    // Verify signature per Midtrans docs: sha512(order_id + status_code + gross_amount + serverKey)
     const serverKey = process.env.MIDTRANS_SERVER_KEY!
-    const hash = crypto.createHash('sha512').update(body + serverKey).digest('hex')
-    
-    if (hash !== signature) {
+    const expectedSignature = crypto
+      .createHash('sha512')
+      .update(`${order_id}${status_code}${gross_amount}${serverKey}`)
+      .digest('hex')
+
+    if (!signature_key || expectedSignature !== signature_key) {
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 400 }
       )
     }
 
-    const notification = JSON.parse(body)
-    const { order_id, transaction_status, fraud_status } = notification
-
-    // Find payment record by midtrans order id
-    const { data: paymentData, error: paymentFetchError } = await supabaseAdmin
+    // Find payment record(s) by midtrans order id (multi-kios friendly)
+    const { data: payments, error: paymentFetchError } = await supabaseAdmin
       .from('pembayaran')
       .select('pesanan_id')
       .eq('midtrans_order_id', order_id)
-      .single()
 
-    if (paymentFetchError || !paymentData) {
+    if (paymentFetchError || !payments || payments.length === 0) {
       console.error('Payment record not found:', paymentFetchError)
       return NextResponse.json(
         { error: 'Payment record not found' },
         { status: 404 }
       )
     }
-
-    const pesananId = paymentData.pesanan_id
 
     // Update payment status
     let paymentStatus = 'pending'
@@ -70,7 +61,7 @@ export async function POST(request: NextRequest) {
       console.error('Error updating payment record:', paymentUpdateError)
     }
 
-    // Update order status in database
+    // Update order status in database for all related pesanan
     let newStatus = 'menunggu'
     
     if (transaction_status === 'capture') {
@@ -87,13 +78,14 @@ export async function POST(request: NextRequest) {
       newStatus = 'menunggu'
     }
 
+    const pesananIds = payments.map(p => p.pesanan_id)
     const { error: pesananUpdateError } = await supabaseAdmin
       .from('pesanan')
       .update({ 
         status: newStatus,
         updated_at: new Date().toISOString()
       })
-      .eq('id', pesananId)
+      .in('id', pesananIds)
 
     if (pesananUpdateError) {
       console.error('Error updating pesanan status:', pesananUpdateError)
@@ -101,36 +93,36 @@ export async function POST(request: NextRequest) {
 
     // Update kantin balance jika pembayaran settlement
     if (transaction_status === 'settlement') {
-      // Get pesanan details untuk mendapatkan kantin_id dan total_harga
-      const { data: pesananData } = await supabaseAdmin
+      // Get pesanan details untuk mendapatkan kantin_id dan total_harga (multi-kios)
+      const { data: pesananDataList } = await supabaseAdmin
         .from('pesanan')
-        .select('kantin_id, total_harga')
-        .eq('id', pesananId)
-        .single()
+        .select('id, kantin_id, total_harga')
+        .in('id', pesananIds)
 
-      if (pesananData) {
-        // Get current balance
-        const { data: kantinData } = await supabaseAdmin
-          .from('kantin')
-          .select('balance')
-          .eq('id', pesananData.kantin_id)
-          .single()
+      if (pesananDataList && pesananDataList.length > 0) {
+        for (const pesananData of pesananDataList) {
+          // Get current balance per kantin
+          const { data: kantinData } = await supabaseAdmin
+            .from('kantin')
+            .select('balance')
+            .eq('id', pesananData.kantin_id)
+            .single()
 
-        const currentBalance = kantinData?.balance || 0
-        // Tambahkan hanya total_harga pesanan ini, bukan total keseluruhan
-        const newBalance = currentBalance + pesananData.total_harga
+          const currentBalance = kantinData?.balance || 0
+          const newBalance = currentBalance + pesananData.total_harga
 
-        // Update balance
-        const { error: balanceError } = await supabaseAdmin
-          .from('kantin')
-          .update({ 
-            balance: newBalance,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', pesananData.kantin_id)
+          // Update balance
+          const { error: balanceError } = await supabaseAdmin
+            .from('kantin')
+            .update({ 
+              balance: newBalance,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', pesananData.kantin_id)
 
-        if (balanceError) {
-          console.error('Error updating kantin balance:', balanceError)
+          if (balanceError) {
+            console.error('Error updating kantin balance:', balanceError)
+          }
         }
       }
     }

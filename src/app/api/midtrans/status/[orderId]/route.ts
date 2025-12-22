@@ -26,22 +26,19 @@ export async function GET(
     // Get transaction status from Midtrans using the midtrans order ID
     const transaction = await (snap as any).transaction.status(orderId)
 
-    // Find the pesanan by midtrans order ID first
-    const { data: paymentData, error: paymentFetchError } = await supabaseAdmin
+    // Find all payments by midtrans order ID (can be multi-kios)
+    const { data: payments, error: paymentFetchError } = await supabaseAdmin
       .from('pembayaran')
       .select('pesanan_id, status')
       .eq('midtrans_order_id', orderId)
-      .single()
 
-    if (paymentFetchError || !paymentData) {
+    if (paymentFetchError || !payments || payments.length === 0) {
       console.error('Payment record not found:', paymentFetchError)
       return NextResponse.json(
         { error: 'Payment record not found' },
         { status: 404 }
       )
     }
-
-    const pesananId = paymentData.pesanan_id
     const midtransStatus = transaction.transaction_status
 
     // Map Midtrans status to our payment status
@@ -66,14 +63,11 @@ export async function GET(
       console.error('Error updating payment record:', paymentUpdateError)
     }
 
-    // The pesanan status will be updated automatically via trigger
-    // when pembayaran status changes to settlement
-
     return NextResponse.json({
       status: midtransStatus,
       paymentStatus: paymentStatus,
       orderId: transaction.order_id,
-      pesananId: pesananId,
+      pesananIds: payments.map(p => p.pesanan_id),
       grossAmount: transaction.gross_amount,
       paymentType: transaction.payment_type,
       transactionTime: transaction.transaction_time
