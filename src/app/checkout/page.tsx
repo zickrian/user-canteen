@@ -89,7 +89,13 @@ export default function CheckoutPage() {
   const checkPaymentStatus = async (orderIdToCheck: string) => {
     try {
       const response = await fetch(`/api/midtrans/status/${orderIdToCheck}`)
-      const data = await response.json()
+      const data = await response.json() as {
+        status?: string
+        paymentStatus?: string
+        orderId?: string
+        pesananId?: string
+        pesananIds?: string[]
+      }
 
       if (data.status === 'settlement') {
         setPaymentStatus('success')
@@ -99,7 +105,16 @@ export default function CheckoutPage() {
           if (isMultiKios && multiKiosOrders.length > 0) {
             router.push(`/struk/preview?orders=${encodeURIComponent(JSON.stringify(multiKiosOrders))}&paymentMethod=qris&paid=true&email=${encodeURIComponent(formData.email)}`)
           } else {
-            router.push(`/struk/${data.pesananId}`)
+            // Untuk single kios, ambil pesananId dari response Midtrans status API
+            const pesananId =
+              (Array.isArray(data.pesananIds) && data.pesananIds[0]) ||
+              data.pesananId
+
+            if (pesananId) {
+              router.push(`/struk/${pesananId}`)
+            } else {
+              console.error('Pesanan ID tidak ditemukan di response Midtrans status', data)
+            }
           }
         }, 2000)
       } else if (['expire', 'cancel', 'deny'].includes(data.status)) {
