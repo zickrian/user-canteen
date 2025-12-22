@@ -97,7 +97,9 @@ export default function CheckoutPage() {
         pesananIds?: string[]
       }
 
-      if (data.status === 'settlement') {
+      const status = data.status || ''
+
+      if (status === 'settlement') {
         setPaymentStatus('success')
         setTimeout(() => {
           clearCart()
@@ -117,7 +119,7 @@ export default function CheckoutPage() {
             }
           }
         }, 2000)
-      } else if (['expire', 'cancel', 'deny'].includes(data.status)) {
+      } else if (['expire', 'cancel', 'deny'].includes(status)) {
         setPaymentStatus('failed')
       }
     } catch (error) {
