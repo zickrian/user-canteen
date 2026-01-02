@@ -30,8 +30,8 @@ export async function generateContent(prompt: string, kantinId: string) {
     // Initialize the client dengan API key yang sudah divalidasi
     const ai = new GoogleGenAI({ apiKey });
 
-    // Decide the model here: using gemini-2.5-flash as a good starting point
-    const modelName = 'gemini-2.5-flash';
+    // Decide the model here: using gemini-2.5-flash-lite as a good starting point
+    const modelName = 'gemini-2.5-flash-lite';
 
     // Try to connect to MCP server, fallback to direct DB if fails
     console.log('Connecting to MCP server...');

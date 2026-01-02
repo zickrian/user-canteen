@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     console.log('KantinId:', kantinId)
     
     const firstRequest = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.5-flash-lite',
       contents: `${SYSTEM_PROMPT}\n\nUser: ${message}\n\nKantin ID: ${kantinId || 'global'}`,
       config: {
         systemInstruction: SYSTEM_PROMPT,
@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
         : '\n\nPENTING: Tool mengembalikan data kosong atau tidak ada data. Katakan "tidak ada" atau "belum ada menu yang sesuai" dengan sopan.'
       
       const secondRequest = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: [
           {
             role: 'user',

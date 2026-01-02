@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { Send, X, User } from 'lucide-react'
+import { Send, X } from 'lucide-react'
 import { Menu, Kantin } from '@/lib/supabase'
 import { useCart } from '@/contexts/CartContext'
 import { supabase } from '@/lib/supabase'
@@ -42,17 +42,22 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
   const { addItem } = useCart()
   const { isAuthenticated } = useAuth()
 
-  // Generate quick reply suggestions based on context
+  // Generate quick reply suggestions based on context (fallback if server doesn't provide)
   const generateQuickReplies = (
     hasMenuData: boolean,
-    lastUserMessage: string
+    lastUserMessage: string,
+    serverQuickReplies?: string[]
   ): string[] => {
+    // Use server-provided quick replies if available
+    if (serverQuickReplies && serverQuickReplies.length > 0) {
+      return serverQuickReplies.slice(0, 6)
+    }
+
     const suggestions: string[] = []
     const lowerMsg = lastUserMessage.toLowerCase()
 
     // Contextual suggestions based on conversation
     if (hasMenuData) {
-      // User got menu results
       if (lowerMsg.includes('makan') || lowerMsg.includes('nasi') || lowerMsg.includes('goreng')) {
         suggestions.push('Minuman apa yang cocok?')
         suggestions.push('Ada yang lebih murah?')
@@ -71,7 +76,6 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
         suggestions.push('Yang paling laris?')
       }
     } else {
-      // No menu results
       if (lowerMsg.includes('budget') || lowerMsg.includes('murah')) {
         suggestions.push('Budget 15rb')
         suggestions.push('Menu paling murah')
@@ -83,7 +87,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       }
     }
 
-    return suggestions.slice(0, 3)
+    return suggestions.slice(0, 6)
   }
 
   const scrollToBottom = () => {
@@ -94,10 +98,11 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     scrollToBottom()
   }, [messages])
 
-  // Check authentication when modal opens
+  // Check authentication when modal opens (skip in development)
   useEffect(() => {
-    if (isOpen && !isAuthenticated && messages.length === 0) {
-      // Show login message when opening chat without authentication
+    const isDevelopment = process.env.NODE_ENV === 'development'
+    if (isOpen && !isAuthenticated && !isDevelopment && messages.length === 0) {
+      // Show login message when opening chat without authentication (production only)
       setMessages([{
         id: Date.now().toString(),
         role: 'assistant',
@@ -139,9 +144,11 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
         comboSuggestions = aiResponse.comboData
       }
 
+      // Use server-provided quick replies or generate fallback
       const newQuickReplies = generateQuickReplies(
         !!(menuSuggestions && menuSuggestions.length > 0) || !!(comboSuggestions && comboSuggestions.length > 0),
-        reply
+        reply,
+        aiResponse.quickReplies
       )
       setQuickReplies(newQuickReplies)
 
@@ -174,10 +181,23 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
 
   const generateAIResponse = async (userMessage: string, currentMessages: AIMessage[]) => {
     try {
-      // Get session token for authentication
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        throw new Error('UNAUTHORIZED')
+      // Check if we're in development mode
+      const isDevelopment = process.env.NODE_ENV === 'development'
+      
+      // Get session token for authentication (skip in development)
+      let authHeader = ''
+      if (!isDevelopment) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          throw new Error('UNAUTHORIZED')
+        }
+        authHeader = `Bearer ${session.access_token}`
+      } else {
+        // In development, try to get session but don't fail if not available
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          authHeader = `Bearer ${session.access_token}`
+        }
       }
 
       // Build conversation history from current messages (last 6 messages)
@@ -189,12 +209,16 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       console.log('Calling chat API with:', { message: userMessage, kantinId, historyLength: history.length })
 
       // Gunakan /api/chat untuk semua request (support dengan atau tanpa kantinId)
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      if (authHeader) {
+        headers['Authorization'] = authHeader
+      }
+
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
+        headers,
         body: JSON.stringify({
           kantin_id: kantinId || undefined,
           message: userMessage,
@@ -217,7 +241,8 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
         message: data.reply || 'Maaf, saya tidak bisa memproses permintaan kamu saat ini.',
         menuData: data.menuData || null,
         comboData: data.comboData || null,
-        toolUsed: data.debug?.intent || 'chat',
+        quickReplies: data.quickReplies || null,
+        toolUsed: data.debug?.toolsCalled || data.debug?.intent || 'chat',
       }
     } catch (error: any) {
       console.error('Error generating AI response:', error)
@@ -229,6 +254,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
           message: 'Lakukan login untuk bisa memulai bercakapan dengan chatbot',
           menuData: null,
           comboData: null,
+          quickReplies: null,
           toolUsed: null,
         }
       }
@@ -238,6 +264,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
         message: `Maaf, saya sedang mengalami masalah teknis. Silakan coba lagi beberapa saat ya! 😅`,
         menuData: null,
         comboData: null,
+        quickReplies: null,
         toolUsed: null,
       }
     }
@@ -273,10 +300,11 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
         comboSuggestions = aiResponse.comboData
       }
 
-      // Generate quick reply suggestions
+      // Use server-provided quick replies or generate fallback
       const newQuickReplies = generateQuickReplies(
         !!(menuSuggestions && menuSuggestions.length > 0) || !!(comboSuggestions && comboSuggestions.length > 0),
-        inputValue
+        inputValue,
+        aiResponse.quickReplies
       )
       setQuickReplies(newQuickReplies)
 
@@ -447,8 +475,10 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
   const renderMenuSuggestions = (menuSuggestions: Menu[]) => (
     <div className="space-y-2 mt-3">
       {menuSuggestions.map((menu) => {
-        const kantinInfo = (menu as any).kantin;
+        const kantinInfo = (menu as any).kantin || (menu as any).nama_kantin ? { nama_kantin: (menu as any).nama_kantin } : null;
         const isGlobalMenu = !kantin && kantinInfo;
+        const avgRating = (menu as any).avg_rating;
+        const ratingCount = (menu as any).rating_count;
 
         return (
           <div
@@ -495,13 +525,18 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
                   <p className="text-sm font-bold text-orange-600">
                     {formatPrice(menu.harga)}
                   </p>
+                  {avgRating > 0 && (
+                    <span className="text-[10px] text-zinc-500 flex items-center gap-0.5">
+                      ⭐ {Number(avgRating).toFixed(1)} ({ratingCount})
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col gap-1 shrink-0">
                 <button
                   onClick={() => {
                     if (isGlobalMenu && kantinInfo) {
-                      handleAddToCart(menu, kantinInfo);
+                      handleAddToCart(menu, kantinInfo as any);
                     } else {
                       handleAddToCart(menu);
                     }
@@ -640,12 +675,12 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       {/* Quick Replies */}
       {quickReplies.length > 0 && !isLoading && (
         <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-zinc-100 bg-white shadow-[0_-4px_12px_rgba(0,0,0,0.02)]">
-          <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide pb-1">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {quickReplies.map((reply, index) => (
               <button
                 key={index}
                 onClick={() => sendQuickReply(reply)}
-                className="flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-semibold bg-zinc-50 border border-zinc-200 rounded-full hover:bg-zinc-100 hover:border-zinc-300 transition-colors text-zinc-700 active:scale-95"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-semibold bg-zinc-50 border border-zinc-200 rounded-full hover:bg-orange-50 hover:border-orange-200 hover:text-orange-700 transition-colors text-zinc-700 active:scale-95"
               >
                 {reply}
               </button>
@@ -661,7 +696,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
             placeholder="Ketik pesan..."
             className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-zinc-50 border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:bg-white transition-all text-xs sm:text-sm placeholder:text-zinc-400 text-zinc-900"
             disabled={isLoading}
