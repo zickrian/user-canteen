@@ -474,7 +474,9 @@ export async function POST(req: NextRequest) {
     console.log(`[Chat] message="${trimmedMessage.substring(0, 50)}..." kantin_id=${kantin_id || 'global'}`)
 
     // Get base URL for internal API calls
+    // Support: NEXT_PUBLIC_APP_URL (manual), RAILWAY_PUBLIC_DOMAIN (Railway), VERCEL_URL (Vercel)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                    (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null) ||
                     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
     // ========== HANDLE SPECIAL CASES (no tool call needed) ==========
