@@ -1,47 +1,48 @@
 /**
- * Test Gemini API Connection
+ * Test Cerebras API Connection
  */
 
 import { NextResponse } from 'next/server'
-import { GoogleGenAI } from '@google/genai'
+import Cerebras from '@cerebras/cerebras_cloud_sdk'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = process.env.CEREBRAS_API_KEY
     
     if (!apiKey) {
       return NextResponse.json({ 
         success: false, 
-        error: 'GEMINI_API_KEY not configured' 
+        error: 'CEREBRAS_API_KEY not configured' 
       }, { status: 500 })
     }
     
-    console.log('[TestGemini] Testing Gemini API...')
-    console.log('[TestGemini] API Key prefix:', apiKey.substring(0, 10) + '...')
+    console.log('[TestCerebras] Testing Cerebras API...')
+    console.log('[TestCerebras] API Key prefix:', apiKey.substring(0, 10) + '...')
     
-    const ai = new GoogleGenAI({ apiKey })
+    const cerebras = new Cerebras({ apiKey })
     
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents: 'Halo, jawab dengan singkat: apa itu nasi goreng?',
-      config: {
-        temperature: 0.5,
-        maxOutputTokens: 100,
-      },
-    })
+    const response = await cerebras.chat.completions.create({
+      model: 'llama-3.3-70b',
+      messages: [
+        { role: 'user', content: 'Halo, jawab dengan singkat: apa itu nasi goreng?' }
+      ],
+      temperature: 0.5,
+      max_completion_tokens: 100,
+      stream: false
+    });
     
-    const text = response.text
-    console.log('[TestGemini] Response:', text)
+    const text = (response as any).choices?.[0]?.message?.content
+    console.log('[TestCerebras] Response:', text)
     
     return NextResponse.json({
       success: true,
       response: text,
-      model: 'gemini-2.0-flash-lite'
+      model: 'llama-3.3-70b'
     })
   } catch (error: any) {
-    console.error('[TestGemini] Error:', error)
+    console.error('[TestCerebras] Error:', error)
     return NextResponse.json({ 
       success: false, 
       error: error.message,

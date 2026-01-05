@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenAI, FunctionCallingConfigMode } from '@google/genai'
+import Cerebras from '@cerebras/cerebras_cloud_sdk'
 import { tools } from '@/lib/geminiTools'
 import { SYSTEM_PROMPT } from '@/lib/systemPrompt'
 import { connectSupabaseMcp, pickSqlTool } from '@/lib/mcp'
@@ -52,17 +52,17 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = process.env.CEREBRAS_API_KEY
     if (!apiKey) {
-      console.error('GEMINI_API_KEY not configured')
+      console.error('CEREBRAS_API_KEY not configured')
       return NextResponse.json(
         { error: 'API key tidak dikonfigurasi' },
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
-    // Initialize GoogleGenAI client
-    const ai = new GoogleGenAI({ apiKey })
+    // Initialize Cerebras client
+    const cerebras = new Cerebras({ apiKey })
 
     // Try to connect to MCP server, fallback to direct DB if fails
     console.log('Connecting to MCP server...')
@@ -75,38 +75,45 @@ export async function POST(req: NextRequest) {
       useFallback = true
     }
 
-    // STEP 1: Kirim pesan ke Gemini untuk merencanakan tool usage
-    console.log('Step 1: Planning with Gemini...')
+    // STEP 1: Kirim pesan ke Cerebras untuk merencanakan tool usage
+    console.log('Step 1: Planning with Cerebras...')
     console.log('Message:', message)
     console.log('KantinId:', kantinId)
-    
-    const firstRequest = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents: `${SYSTEM_PROMPT}\n\nUser: ${message}\n\nKantin ID: ${kantinId || 'global'}`,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        toolConfig: {
-          functionCallingConfig: {
-            mode: FunctionCallingConfigMode.AUTO,
-          },
-        },
-        tools: [{ functionDeclarations: tools.functionDeclarations }],
-        temperature: 0.4,
-        maxOutputTokens: 800,
-      },
-    })
 
-    const firstResponse = firstRequest
+    // Convert Gemini tools to OpenAI format
+    const openaiTools = tools.functionDeclarations.map((tool: any) => ({
+      type: 'function',
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parametersJsonSchema,
+      }
+    }));
+    
+    const firstRequest = await cerebras.chat.completions.create({
+      model: 'llama-3.3-70b',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `User: ${message}\n\nKantin ID: ${kantinId || 'global'}` }
+      ],
+      tools: openaiTools,
+      tool_choice: 'auto',
+      temperature: 0.4,
+      max_completion_tokens: 800,
+      stream: false
+    });
+
+    const firstResponse = firstRequest as any
     console.log('First response:', JSON.stringify(firstResponse, null, 2))
 
-    const toolCall = firstResponse.functionCalls?.[0]
+    const toolCall = firstResponse.choices?.[0]?.message?.tool_calls?.[0];
 
-    // STEP 2: Jika ada tool call, eksekusi dan kirim hasil ke Gemini
-    if (toolCall?.name) {
-      console.log('Step 2: Executing tool:', toolCall.name)
-      console.log('Tool args:', toolCall.args)
+    // STEP 2: Jika ada tool call, eksekusi dan kirim hasil ke Cerebras
+    if (toolCall?.function?.name) {
+      console.log('Step 2: Executing tool:', toolCall.function.name)
+      console.log('Tool args:', toolCall.function.arguments)
 
-      const args = (toolCall.args || {}) as Record<string, any>
+      const args = JSON.parse(toolCall.function.arguments || '{}') as Record<string, any>
       
       // Inject kantinId dari context jika tidak ada di args tapi ada di request
       if (kantinId && !args.kantin_id) {
@@ -122,7 +129,7 @@ export async function POST(req: NextRequest) {
           // Use direct database fallback
           console.log('Using direct database fallback...')
           toolResult = await runFunctionWithFallback({
-            name: toolCall.name,
+            name: toolCall.function.name,
             args,
           })
         } else {
@@ -130,7 +137,7 @@ export async function POST(req: NextRequest) {
           toolResult = await runFunctionByName({
             mcp,
             sqlToolName: sqlToolName!,
-            name: toolCall.name,
+            name: toolCall.function.name,
             args,
           })
         }
@@ -146,7 +153,7 @@ export async function POST(req: NextRequest) {
           console.log('Retrying with direct database fallback...')
           try {
             toolResult = await runFunctionWithFallback({
-              name: toolCall.name,
+              name: toolCall.function.name,
               args,
             })
             console.log('Fallback result:', JSON.stringify(toolResult, null, 2))
@@ -159,7 +166,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // STEP 3: Kirim hasil tool ke Gemini untuk generate jawaban final
+      // STEP 3: Kirim hasil tool ke Cerebras untuk generate jawaban final
       console.log('Step 3: Generating final response...')
       
       // Normalize tool result untuk response
@@ -185,48 +192,33 @@ export async function POST(req: NextRequest) {
         ? '\n\nPENTING: Tool telah mengembalikan data. Data TIDAK kosong. LANGSUNG jawab dengan data tersebut sesuai pertanyaan user. JANGAN bilang "tidak ada jawaban" atau "maaf tidak ada jawaban" karena ada data. Gunakan data tersebut untuk menjawab pertanyaan user dengan tepat.'
         : '\n\nPENTING: Tool mengembalikan data kosong atau tidak ada data. Katakan "tidak ada" atau "belum ada menu yang sesuai" dengan sopan.'
       
-      const secondRequest = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: `${SYSTEM_PROMPT}\n\nUser: ${message}\n\nKantin ID: ${kantinId || 'global'}${dataInstruction}` }
-            ],
+      const secondRequest = await cerebras.chat.completions.create({
+        model: 'llama-3.3-70b',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `User: ${message}\n\nKantin ID: ${kantinId || 'global'}${dataInstruction}` },
+          { 
+            role: 'assistant',
+            content: null,
+            tool_calls: [toolCall]
           },
           {
-            role: 'model',
-            parts: [{ functionCall: toolCall }],
-          },
-          {
-            role: 'user',
-            parts: [
-              {
-                functionResponse: {
-                  name: toolCall.name,
-                  response: { result: toolResult },
-                },
-              },
-            ],
-          },
+            role: 'tool',
+            content: JSON.stringify({ result: toolResult }),
+            tool_call_id: toolCall.id
+          }
         ],
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          toolConfig: {
-            functionCallingConfig: {
-              mode: FunctionCallingConfigMode.AUTO,
-            },
-          },
-          tools: [{ functionDeclarations: tools.functionDeclarations }],
-          temperature: 0.4,
-          maxOutputTokens: 900,
-        },
-      })
+        tools: openaiTools,
+        tool_choice: 'auto',
+        temperature: 0.4,
+        max_completion_tokens: 900,
+        stream: false
+      });
 
-      const secondResponse = secondRequest
+      const secondResponse = secondRequest as any
       console.log('Second response:', JSON.stringify(secondResponse, null, 2))
 
-      let text = secondResponse.text || 'Maaf, tidak ada jawaban.'
+      let text = secondResponse.choices?.[0]?.message?.content || 'Maaf, tidak ada jawaban.'
 
       // Bersihkan markdown formatting
       text = cleanMarkdown(text)
@@ -235,7 +227,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           response: text,
-          toolUsed: toolCall.name,
+          toolUsed: toolCall.function.name,
           menuData: normalizedResult,
         },
         { headers: { 'Content-Type': 'application/json' } }
@@ -244,7 +236,7 @@ export async function POST(req: NextRequest) {
 
     // STEP 4: Jika tidak ada tool call, kembalikan response langsung
     console.log('No tool call, returning direct response')
-    let text = firstResponse.text || 'Maaf, tidak ada jawaban.'
+    let text = (firstResponse as any).choices?.[0]?.message?.content || 'Maaf, tidak ada jawaban.'
     text = cleanMarkdown(text)
 
     return NextResponse.json(

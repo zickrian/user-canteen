@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenAI, Type } from '@google/genai'
+import Cerebras from '@cerebras/cerebras_cloud_sdk'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { createClient } from '@supabase/supabase-js'
 
@@ -61,180 +61,202 @@ PENTING - PEMBEDAAN MAKANAN vs MINUMAN:
 - JANGAN mencampur makanan dan minuman ketika user spesifik tanya tentang "makanan"`
 
 // ============================================
-// TOOL DEFINITIONS untuk Gemini
+// TOOL DEFINITIONS untuk Cerebras (OpenAI format)
 // ============================================
 const TOOL_DEFINITIONS = [
   {
-    name: 'search_menu',
-    description: 'Cari/rekomendasi menu berdasarkan query dan filter. Gunakan untuk pencarian umum, rekomendasi, atau filter kategori.',
-    parameters: {
-      type: Type.OBJECT as const,
-      properties: {
-        kantin_id: { type: Type.STRING as const, description: 'UUID kantin (opsional)', nullable: true },
-        query: { type: Type.STRING as const, description: 'Kata kunci pencarian (opsional)', nullable: true },
-        kategori: { 
-          type: Type.STRING as const, 
-          description: 'Kategori menu: makan_pagi, makan_siang, snack, minuman',
-          enum: ['makan_pagi', 'makan_siang', 'snack', 'minuman'],
-          nullable: true,
+    type: 'function',
+    function: {
+      name: 'search_menu',
+      description: 'Cari/rekomendasi menu berdasarkan query dan filter. Gunakan untuk pencarian umum, rekomendasi, atau filter kategori.',
+      parameters: {
+        type: 'object',
+        properties: {
+          kantin_id: { type: 'string', description: 'UUID kantin (opsional)' },
+          query: { type: 'string', description: 'Kata kunci pencarian (opsional)' },
+          kategori: { 
+            type: 'string', 
+            description: 'Kategori menu: makan_pagi, makan_siang, snack, minuman',
+            enum: ['makan_pagi', 'makan_siang', 'snack', 'minuman'],
+          },
+          max_price: { type: 'number', description: 'Harga maksimal (opsional)' },
+          sort: { 
+            type: 'string', 
+            description: 'Urutan: rating_desc, price_asc, price_desc, best_seller_desc',
+            enum: ['rating_desc', 'price_asc', 'price_desc', 'best_seller_desc'],
+          },
+          limit: { type: 'number', description: 'Jumlah hasil (default 10)' },
         },
-        max_price: { type: Type.NUMBER as const, description: 'Harga maksimal (opsional)', nullable: true },
-        sort: { 
-          type: Type.STRING as const, 
-          description: 'Urutan: rating_desc, price_asc, price_desc, best_seller_desc',
-          enum: ['rating_desc', 'price_asc', 'price_desc', 'best_seller_desc'],
-          nullable: true,
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_menu_by_kantin',
+      description: 'List semua menu dari kantin/kios tertentu. Gunakan ketika user tanya "menu di kios X" atau "apa aja di kantin Y".',
+      parameters: {
+        type: 'object',
+        properties: {
+          kantin_id: { type: 'string', description: 'UUID kantin' },
+          kantin_name: { type: 'string', description: 'Nama kantin untuk pencarian' },
+          sort: { 
+            type: 'string', 
+            enum: ['rating_desc', 'price_asc', 'price_desc', 'best_seller_desc'],
+          },
+          limit: { type: 'number', description: 'Jumlah hasil (default 10)' },
         },
-        limit: { type: Type.NUMBER as const, description: 'Jumlah hasil (default 10)', nullable: true },
+        required: [],
       },
-      required: [] as string[],
     },
   },
   {
-    name: 'list_menu_by_kantin',
-    description: 'List semua menu dari kantin/kios tertentu. Gunakan ketika user tanya "menu di kios X" atau "apa aja di kantin Y".',
-    parameters: {
-      type: Type.OBJECT as const,
-      properties: {
-        kantin_id: { type: Type.STRING as const, description: 'UUID kantin', nullable: true },
-        kantin_name: { type: Type.STRING as const, description: 'Nama kantin untuk pencarian', nullable: true },
-        sort: { 
-          type: Type.STRING as const, 
-          enum: ['rating_desc', 'price_asc', 'price_desc', 'best_seller_desc'],
-          nullable: true,
+    type: 'function',
+    function: {
+      name: 'get_cheapest',
+      description: 'Dapatkan menu TERMURAH. Gunakan ketika user tanya "yang termurah", "paling murah".',
+      parameters: {
+        type: 'object',
+        properties: {
+          kantin_id: { type: 'string', description: 'UUID kantin (opsional)' },
+          kantin_name: { type: 'string', description: 'Nama kantin untuk filter' },
+          kategori: { 
+            type: 'string', 
+            description: 'Kategori: makanan, minuman, snack',
+            enum: ['makanan', 'makan_pagi', 'makan_siang', 'snack', 'minuman'],
+          },
+          limit: { type: 'number', description: 'Jumlah hasil (default 5)' },
         },
-        limit: { type: Type.NUMBER as const, description: 'Jumlah hasil (default 10)', nullable: true },
+        required: [],
       },
-      required: [] as string[],
     },
   },
   {
-    name: 'get_cheapest',
-    description: 'Dapatkan menu TERMURAH. Gunakan ketika user tanya "yang termurah", "paling murah".',
-    parameters: {
-      type: Type.OBJECT as const,
-      properties: {
-        kantin_id: { type: Type.STRING as const, description: 'UUID kantin (opsional)', nullable: true },
-        kantin_name: { type: Type.STRING as const, description: 'Nama kantin untuk filter', nullable: true },
-        kategori: { 
-          type: Type.STRING as const, 
-          description: 'Kategori: makanan, minuman, snack',
-          enum: ['makanan', 'makan_pagi', 'makan_siang', 'snack', 'minuman'],
-          nullable: true,
+    type: 'function',
+    function: {
+      name: 'get_priciest',
+      description: 'Dapatkan menu TERMAHAL. Gunakan ketika user tanya "yang termahal", "paling mahal".',
+      parameters: {
+        type: 'object',
+        properties: {
+          kantin_id: { type: 'string', description: 'UUID kantin (opsional)' },
+          kantin_name: { type: 'string', description: 'Nama kantin untuk filter' },
+          kategori: { 
+            type: 'string', 
+            enum: ['makanan', 'makan_pagi', 'makan_siang', 'snack', 'minuman'],
+          },
+          limit: { type: 'number', description: 'Jumlah hasil (default 5)' },
         },
-        limit: { type: Type.NUMBER as const, description: 'Jumlah hasil (default 5)', nullable: true },
+        required: [],
       },
-      required: [] as string[],
     },
   },
   {
-    name: 'get_priciest',
-    description: 'Dapatkan menu TERMAHAL. Gunakan ketika user tanya "yang termahal", "paling mahal".',
-    parameters: {
-      type: Type.OBJECT as const,
-      properties: {
-        kantin_id: { type: Type.STRING as const, description: 'UUID kantin (opsional)', nullable: true },
-        kantin_name: { type: Type.STRING as const, description: 'Nama kantin untuk filter', nullable: true },
-        kategori: { 
-          type: Type.STRING as const, 
-          enum: ['makanan', 'makan_pagi', 'makan_siang', 'snack', 'minuman'],
-          nullable: true,
+    type: 'function',
+    function: {
+      name: 'list_under_price',
+      description: 'List menu dengan harga di bawah/maksimal X. Gunakan ketika user tanya "di bawah 10rb", "maksimal 15k".',
+      parameters: {
+        type: 'object',
+        properties: {
+          max_price: { type: 'number', description: 'Harga maksimal (WAJIB)' },
+          kantin_id: { type: 'string', description: 'UUID kantin (opsional)' },
+          kantin_name: { type: 'string', description: 'Nama kantin (opsional)' },
+          kategori: { 
+            type: 'string', 
+            enum: ['makanan', 'makan_pagi', 'makan_siang', 'snack', 'minuman'],
+          },
+          limit: { type: 'number', description: 'Jumlah hasil (default 10)' },
         },
-        limit: { type: Type.NUMBER as const, description: 'Jumlah hasil (default 5)', nullable: true },
+        required: ['max_price'],
       },
-      required: [] as string[],
     },
   },
   {
-    name: 'list_under_price',
-    description: 'List menu dengan harga di bawah/maksimal X. Gunakan ketika user tanya "di bawah 10rb", "maksimal 15k".',
-    parameters: {
-      type: Type.OBJECT as const,
-      properties: {
-        max_price: { type: Type.NUMBER as const, description: 'Harga maksimal (WAJIB)' },
-        kantin_id: { type: Type.STRING as const, description: 'UUID kantin (opsional)', nullable: true },
-        kantin_name: { type: Type.STRING as const, description: 'Nama kantin (opsional)', nullable: true },
-        kategori: { 
-          type: Type.STRING as const, 
-          enum: ['makanan', 'makan_pagi', 'makan_siang', 'snack', 'minuman'],
-          nullable: true,
+    type: 'function',
+    function: {
+      name: 'recommend_combo_under_budget',
+      description: 'Rekomendasi PAKET makanan + minuman dalam budget. Gunakan ketika user minta "paket", "combo", "makanan dan minuman budget X".',
+      parameters: {
+        type: 'object',
+        properties: {
+          budget: { type: 'number', description: 'Budget total (WAJIB)' },
+          kantin_id: { type: 'string', description: 'UUID kantin (opsional)' },
+          kantin_name: { type: 'string', description: 'Nama kantin (opsional)' },
+          limit: { type: 'number', description: 'Jumlah combo (default 5)' },
         },
-        limit: { type: Type.NUMBER as const, description: 'Jumlah hasil (default 10)', nullable: true },
+        required: ['budget'],
       },
-      required: ['max_price'] as string[],
     },
   },
   {
-    name: 'recommend_combo_under_budget',
-    description: 'Rekomendasi PAKET makanan + minuman dalam budget. Gunakan ketika user minta "paket", "combo", "makanan dan minuman budget X".',
-    parameters: {
-      type: Type.OBJECT as const,
-      properties: {
-        budget: { type: Type.NUMBER as const, description: 'Budget total (WAJIB)' },
-        kantin_id: { type: Type.STRING as const, description: 'UUID kantin (opsional)', nullable: true },
-        kantin_name: { type: Type.STRING as const, description: 'Nama kantin (opsional)', nullable: true },
-        limit: { type: Type.NUMBER as const, description: 'Jumlah combo (default 5)', nullable: true },
-      },
-      required: ['budget'] as string[],
-    },
-  },
-  {
-    name: 'get_popular_menu',
-    description: 'Dapatkan menu PALING LARIS/POPULER berdasarkan jumlah terjual. Gunakan ketika user tanya "yang paling laris", "menu populer", "best seller".',
-    parameters: {
-      type: Type.OBJECT as const,
-      properties: {
-        kantin_id: { type: Type.STRING as const, description: 'UUID kantin (opsional)', nullable: true },
-        kantin_name: { type: Type.STRING as const, description: 'Nama kantin untuk filter', nullable: true },
-        kategori: { 
-          type: Type.STRING as const, 
-          enum: ['makanan', 'makan_pagi', 'makan_siang', 'snack', 'minuman'],
-          nullable: true,
+    type: 'function',
+    function: {
+      name: 'get_popular_menu',
+      description: 'Dapatkan menu PALING LARIS/POPULER berdasarkan jumlah terjual. Gunakan ketika user tanya "yang paling laris", "menu populer", "best seller".',
+      parameters: {
+        type: 'object',
+        properties: {
+          kantin_id: { type: 'string', description: 'UUID kantin (opsional)' },
+          kantin_name: { type: 'string', description: 'Nama kantin untuk filter' },
+          kategori: { 
+            type: 'string', 
+            enum: ['makanan', 'makan_pagi', 'makan_siang', 'snack', 'minuman'],
+          },
+          limit: { type: 'number', description: 'Jumlah hasil (default 10)' },
         },
-        limit: { type: Type.NUMBER as const, description: 'Jumlah hasil (default 10)', nullable: true },
+        required: [],
       },
-      required: [] as string[],
     },
   },
   {
-    name: 'get_top_rated',
-    description: 'Dapatkan menu dengan RATING TERTINGGI. Gunakan ketika user tanya "rating tertinggi", "menu terbaik", "paling enak".',
-    parameters: {
-      type: Type.OBJECT as const,
-      properties: {
-        kantin_id: { type: Type.STRING as const, description: 'UUID kantin (opsional)', nullable: true },
-        kantin_name: { type: Type.STRING as const, description: 'Nama kantin untuk filter', nullable: true },
-        kategori: { 
-          type: Type.STRING as const, 
-          enum: ['makanan', 'makan_pagi', 'makan_siang', 'snack', 'minuman'],
-          nullable: true,
+    type: 'function',
+    function: {
+      name: 'get_top_rated',
+      description: 'Dapatkan menu dengan RATING TERTINGGI. Gunakan ketika user tanya "rating tertinggi", "menu terbaik", "paling enak".',
+      parameters: {
+        type: 'object',
+        properties: {
+          kantin_id: { type: 'string', description: 'UUID kantin (opsional)' },
+          kantin_name: { type: 'string', description: 'Nama kantin untuk filter' },
+          kategori: { 
+            type: 'string', 
+            enum: ['makanan', 'makan_pagi', 'makan_siang', 'snack', 'minuman'],
+          },
+          limit: { type: 'number', description: 'Jumlah hasil (default 10)' },
         },
-        limit: { type: Type.NUMBER as const, description: 'Jumlah hasil (default 10)', nullable: true },
+        required: [],
       },
-      required: [] as string[],
     },
   },
   {
-    name: 'list_all_kantin',
-    description: 'List SEMUA KANTIN yang aktif. Gunakan ketika user tanya "kantin apa aja", "list kantin", "ada kantin apa".',
-    parameters: {
-      type: Type.OBJECT as const,
-      properties: {
-        only_open: { type: Type.BOOLEAN as const, description: 'Hanya tampilkan kantin yang sedang buka', nullable: true },
+    type: 'function',
+    function: {
+      name: 'list_all_kantin',
+      description: 'List SEMUA KANTIN yang aktif. Gunakan ketika user tanya "kantin apa aja", "list kantin", "ada kantin apa".',
+      parameters: {
+        type: 'object',
+        properties: {
+          only_open: { type: 'boolean', description: 'Hanya tampilkan kantin yang sedang buka' },
+        },
+        required: [],
       },
-      required: [] as string[],
     },
   },
   {
-    name: 'get_kantin_info',
-    description: 'Info detail KANTIN tertentu (jam buka/tutup, status). Gunakan ketika user tanya "jam buka kantin X", "kantin X buka ga", "info kantin X".',
-    parameters: {
-      type: Type.OBJECT as const,
-      properties: {
-        kantin_id: { type: Type.STRING as const, description: 'UUID kantin', nullable: true },
-        kantin_name: { type: Type.STRING as const, description: 'Nama kantin untuk pencarian', nullable: true },
+    type: 'function',
+    function: {
+      name: 'get_kantin_info',
+      description: 'Info detail KANTIN tertentu (jam buka/tutup, status). Gunakan ketika user tanya "jam buka kantin X", "kantin X buka ga", "info kantin X".',
+      parameters: {
+        type: 'object',
+        properties: {
+          kantin_id: { type: 'string', description: 'UUID kantin' },
+          kantin_name: { type: 'string', description: 'Nama kantin untuk pencarian' },
+        },
+        required: [],
       },
-      required: [] as string[],
     },
   },
 ]
@@ -509,13 +531,13 @@ export async function POST(req: NextRequest) {
     }
 
     // ========== GEMINI WITH TOOL CALLING ==========
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = process.env.CEREBRAS_API_KEY
     if (!apiKey) {
-      console.error('[Chat] GEMINI_API_KEY not configured')
+      console.error('[Chat] CEREBRAS_API_KEY not configured')
       return NextResponse.json({ error: 'AI service not configured', code: 'CONFIG_ERROR' }, { status: 500 })
     }
 
-    const ai = new GoogleGenAI({ apiKey })
+    const cerebras = new Cerebras({ apiKey })
 
     // Build conversation context
     let conversationContext = ''
@@ -545,24 +567,27 @@ User: "${trimmedMessage}"
 
 Analisis pesan user dan tentukan apakah perlu memanggil tool untuk mendapatkan data menu. Jika perlu data, panggil tool yang sesuai. Jika tidak perlu data (misal: sapaan, terima kasih), jawab langsung.`
 
-    console.log('[Chat] Calling Gemini with tools...')
+    console.log('[Chat] Calling Cerebras with tools...')
 
-    // First call - let Gemini decide if tool is needed
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents: fullPrompt,
-      config: {
-        temperature: 0.3,
-        maxOutputTokens: 1000,
-        tools: [{ functionDeclarations: TOOL_DEFINITIONS as any }],
-      },
-    })
+    // First call - let Cerebras decide if tool is needed
+    const response = await cerebras.chat.completions.create({
+      model: 'llama-3.3-70b',
+      messages: [
+        { role: 'system', content: fullPrompt },
+        { role: 'user', content: trimmedMessage }
+      ],
+      tools: TOOL_DEFINITIONS,
+      tool_choice: 'auto',
+      temperature: 0.3,
+      max_completion_tokens: 1000,
+      stream: false
+    });
 
-    // Check if Gemini wants to call a tool
-    const functionCalls = response.functionCalls
+    // Check if Cerebras wants to call a tool
+    const functionCalls = (response as any).choices?.[0]?.message?.tool_calls
     
     if (functionCalls && functionCalls.length > 0) {
-      console.log('[Chat] Gemini requested tool calls:', functionCalls.map(fc => fc.name))
+      console.log('[Chat] Cerebras requested tool calls:', functionCalls.map((fc: any) => fc.function?.name))
       
       // Execute all tool calls
       const toolResults: any[] = []
@@ -570,8 +595,9 @@ Analisis pesan user dan tentukan apakah perlu memanggil tool untuk mendapatkan d
       let comboData: any[] = []
 
       for (const fc of functionCalls) {
-        const result = await executeToolCall(fc.name || '', fc.args || {}, baseUrl)
-        toolResults.push({ name: fc.name, result })
+        const args = JSON.parse((fc as any).function?.arguments || '{}')
+        const result = await executeToolCall((fc as any).function?.name || '', args, baseUrl)
+        toolResults.push({ name: (fc as any).function?.name, result })
 
         // Collect menu/combo data for UI
         if (result.items) {
@@ -582,7 +608,7 @@ Analisis pesan user dan tentukan apakah perlu memanggil tool untuk mendapatkan d
         }
       }
 
-      // Second call - let Gemini summarize the results
+      // Second call - let Cerebras summarize the results
       const toolResultsText = toolResults.map(tr => {
         if (tr.result.error) {
           return `Tool ${tr.name}: Error - ${tr.result.error}`
@@ -622,16 +648,17 @@ ${toolResultsText}
 
 Berikan jawaban natural dan ramah berdasarkan data di atas. Jika tidak ada hasil, katakan dengan jelas "Tidak ada menu yang sesuai" dan berikan saran alternatif. JANGAN mengarang menu yang tidak ada di data.`
 
-      const summaryResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
-        contents: summaryPrompt,
-        config: {
-          temperature: 0.5,
-          maxOutputTokens: 500,
-        },
-      })
+      const summaryResponse = await cerebras.chat.completions.create({
+        model: 'llama-3.3-70b',
+        messages: [
+          { role: 'system', content: summaryPrompt }
+        ],
+        temperature: 0.5,
+        max_completion_tokens: 500,
+        stream: false
+      });
 
-      let reply = cleanMarkdown(summaryResponse.text || 'Maaf, saya tidak bisa memproses permintaan kamu.')
+      let reply = cleanMarkdown((summaryResponse as any).choices?.[0]?.message?.content || 'Maaf, saya tidak bisa memproses permintaan kamu.')
 
       // Determine quick replies based on result
       const hasResults = menuData.length > 0 || comboData.length > 0
@@ -657,7 +684,7 @@ Berikan jawaban natural dan ramah berdasarkan data di atas. Jika tidak ada hasil
         comboData: formattedComboData.length > 0 ? formattedComboData : undefined,
         quickReplies,
         debug: {
-          toolsCalled: functionCalls.map(fc => fc.name),
+          toolsCalled: functionCalls.map((fc: any) => fc.function?.name),
           menuCount: menuData.length,
           comboCount: formattedComboData.length,
         },
@@ -665,7 +692,7 @@ Berikan jawaban natural dan ramah berdasarkan data di atas. Jika tidak ada hasil
     }
 
     // No tool call needed - return direct response
-    let reply = cleanMarkdown(response.text || 'Maaf, saya tidak bisa memproses permintaan kamu.')
+    let reply = cleanMarkdown((response as any).choices?.[0]?.message?.content || 'Maaf, saya tidak bisa memproses permintaan kamu.')
 
     console.log('[Chat] No tool call needed, returning direct response')
 

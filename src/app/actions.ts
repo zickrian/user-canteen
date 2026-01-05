@@ -1,6 +1,6 @@
 'use server'; // Marks all functions in this file as server actions
 
-import { GoogleGenAI, FunctionCallingConfigMode } from '@google/genai';
+import Cerebras from '@cerebras/cerebras_cloud_sdk';
 import { tools } from '@/lib/geminiTools';
 import { SYSTEM_PROMPT } from '@/lib/systemPrompt';
 import { connectSupabaseMcp, pickSqlTool } from '@/lib/mcp';
@@ -13,25 +13,20 @@ export async function generateContent(prompt: string, kantinId: string) {
 
   try {
     // Validasi API key terlebih dahulu
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.CEREBRAS_API_KEY;
     if (!apiKey || apiKey.trim() === '') {
-      console.error('GEMINI_API_KEY not configured in environment variables');
+      console.error('CEREBRAS_API_KEY not configured in environment variables');
       return {
-        error: 'API key tidak dikonfigurasi. Pastikan GEMINI_API_KEY ada di file .env.local',
-        details: 'Silakan tambahkan GEMINI_API_KEY di file .env.local'
+        error: 'API key tidak dikonfigurasi. Pastikan CEREBRAS_API_KEY ada di file .env.local',
+        details: 'Silakan tambahkan CEREBRAS_API_KEY di file .env.local'
       };
     }
 
-    // Validasi format API key (Google Gemini API key biasanya dimulai dengan AIzaSy)
-    if (!apiKey.startsWith('AIzaSy') && !apiKey.startsWith('gen-')) {
-      console.warn('API key format mungkin tidak valid. Google Gemini API key biasanya dimulai dengan AIzaSy');
-    }
-
     // Initialize the client dengan API key yang sudah divalidasi
-    const ai = new GoogleGenAI({ apiKey });
+    const cerebras = new Cerebras({ apiKey });
 
-    // Decide the model here: using gemini-2.5-flash-lite as a good starting point
-    const modelName = 'gemini-2.5-flash-lite';
+    // Decide the model here: using llama-3.3-70b
+    const modelName = 'llama-3.3-70b';
 
     // Try to connect to MCP server, fallback to direct DB if fails
     console.log('Connecting to MCP server...');
@@ -44,36 +39,43 @@ export async function generateContent(prompt: string, kantinId: string) {
       useFallback = true;
     }
 
-    // STEP 1: Kirim pesan ke Gemini untuk merencanakan tool usage
-    console.log('Step 1: Planning with Gemini...');
+    // STEP 1: Kirim pesan ke Cerebras untuk merencanakan tool usage
+    console.log('Step 1: Planning with Cerebras...');
     console.log('Message:', prompt);
     console.log('KantinId:', kantinId);
+
+    // Convert Gemini tools to OpenAI format
+    const openaiTools = tools.functionDeclarations.map((tool: any) => ({
+      type: 'function',
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parametersJsonSchema,
+      }
+    }));
     
-    const firstRequest = await ai.models.generateContent({
+    const firstRequest = await cerebras.chat.completions.create({
       model: modelName,
-      contents: `${SYSTEM_PROMPT}\n\nUser: ${prompt}\n\nKantin ID: ${kantinId || 'global'}`,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        toolConfig: {
-          functionCallingConfig: {
-            mode: FunctionCallingConfigMode.AUTO,
-          },
-        },
-        tools: [{ functionDeclarations: tools.functionDeclarations }],
-        temperature: 0.4,
-        maxOutputTokens: 800,
-      },
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `User: ${prompt}\n\nKantin ID: ${kantinId || 'global'}` }
+      ],
+      tools: openaiTools,
+      tool_choice: 'auto',
+      temperature: 0.4,
+      max_completion_tokens: 800,
+      stream: false
     });
 
-    const firstResponse = firstRequest;
-    const toolCall = firstResponse.functionCalls?.[0];
+    const firstResponse = firstRequest as any;
+    const toolCall = firstResponse.choices?.[0]?.message?.tool_calls?.[0];
 
-    // STEP 2: Jika ada tool call, eksekusi dan kirim hasil ke Gemini
-    if (toolCall?.name) {
-      console.log('Step 2: Executing tool:', toolCall.name);
-      console.log('Tool args:', toolCall.args);
+    // STEP 2: Jika ada tool call, eksekusi dan kirim hasil ke Cerebras
+    if (toolCall?.function?.name) {
+      console.log('Step 2: Executing tool:', toolCall.function.name);
+      console.log('Tool args:', toolCall.function.arguments);
 
-      const args = toolCall.args || {};
+      const args = JSON.parse(toolCall.function.arguments || '{}');
       
       // Inject kantinId dari context jika tidak ada di args tapi ada di parameter
       if (kantinId && !args.kantin_id) {
@@ -89,7 +91,7 @@ export async function generateContent(prompt: string, kantinId: string) {
           // Use direct database fallback
           console.log('Using direct database fallback...');
           toolResult = await runFunctionWithFallback({
-            name: toolCall.name,
+            name: toolCall.function.name,
             args,
           });
         } else {
@@ -97,7 +99,7 @@ export async function generateContent(prompt: string, kantinId: string) {
           toolResult = await runFunctionByName({
             mcp,
             sqlToolName: sqlToolName!,
-            name: toolCall.name,
+            name: toolCall.function.name,
             args,
           });
         }
@@ -113,7 +115,7 @@ export async function generateContent(prompt: string, kantinId: string) {
           console.log('Retrying with direct database fallback...');
           try {
             toolResult = await runFunctionWithFallback({
-              name: toolCall.name,
+              name: toolCall.function.name,
               args,
             });
             console.log('Fallback result:', JSON.stringify(toolResult, null, 2));
@@ -126,7 +128,7 @@ export async function generateContent(prompt: string, kantinId: string) {
         }
       }
 
-      // STEP 3: Kirim hasil tool ke Gemini untuk generate jawaban final
+      // STEP 3: Kirim hasil tool ke Cerebras untuk generate jawaban final
       console.log('Step 3: Generating final response...');
       
       // Normalize tool result untuk response
@@ -152,60 +154,45 @@ export async function generateContent(prompt: string, kantinId: string) {
         ? '\n\nPENTING: Tool telah mengembalikan data. Data TIDAK kosong. LANGSUNG jawab dengan data tersebut sesuai pertanyaan user. JANGAN bilang "tidak ada jawaban" atau "maaf tidak ada jawaban" karena ada data. Gunakan data tersebut untuk menjawab pertanyaan user dengan tepat.'
         : '\n\nPENTING: Tool mengembalikan data kosong atau tidak ada data. Katakan "tidak ada" atau "belum ada menu yang sesuai" dengan sopan.';
       
-      const secondRequest = await ai.models.generateContent({
+      const secondRequest = await cerebras.chat.completions.create({
         model: modelName,
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: `${SYSTEM_PROMPT}\n\nUser: ${prompt}\n\nKantin ID: ${kantinId || 'global'}${dataInstruction}` }
-            ],
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `User: ${prompt}\n\nKantin ID: ${kantinId || 'global'}${dataInstruction}` },
+          { 
+            role: 'assistant',
+            content: null,
+            tool_calls: [toolCall]
           },
           {
-            role: 'model',
-            parts: [{ functionCall: toolCall }],
-          },
-          {
-            role: 'user',
-            parts: [
-              {
-                functionResponse: {
-                  name: toolCall.name,
-                  response: { result: toolResult },
-                }
-              }
-            ],
-          },
+            role: 'tool',
+            content: JSON.stringify({ result: toolResult }),
+            tool_call_id: toolCall.id
+          }
         ],
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          toolConfig: {
-            functionCallingConfig: {
-              mode: FunctionCallingConfigMode.AUTO,
-            },
-          },
-          tools: [{ functionDeclarations: tools.functionDeclarations }],
-          temperature: 0.4,
-          maxOutputTokens: 900,
-        },
+        tools: openaiTools,
+        tool_choice: 'auto',
+        temperature: 0.4,
+        max_completion_tokens: 900,
+        stream: false
       });
 
-      const secondResponse = secondRequest;
-      let text = secondResponse.text || 'Maaf, tidak ada jawaban.';
+      const secondResponse = secondRequest as any;
+      let text = secondResponse.choices?.[0]?.message?.content || 'Maaf, tidak ada jawaban.';
 
       // Bersihkan markdown formatting
       text = cleanMarkdown(text);
 
       return {
         response: text,
-        toolUsed: toolCall.name,
+        toolUsed: toolCall.function.name,
         menuData: normalizedResult,
       };
     }
 
     // STEP 4: Jika tidak ada tool call, kembalikan response langsung
     console.log('No tool call, returning direct response');
-    let text = firstResponse.text || 'Maaf, tidak ada jawaban.';
+    let text = (firstResponse as any).choices?.[0]?.message?.content || 'Maaf, tidak ada jawaban.';
     text = cleanMarkdown(text);
 
     return {
@@ -217,10 +204,10 @@ export async function generateContent(prompt: string, kantinId: string) {
     console.error("Error generating content:", error);
     
     // Handle API key errors specifically
-    if (error?.message?.includes('API key') || error?.code === 400) {
+    if (error?.message?.includes('API key') || error?.code === 400 || error?.code === 401) {
       return {
         error: "API key tidak valid atau tidak dikonfigurasi.",
-        details: "Pastikan GEMINI_API_KEY ada di file .env.local dan valid. Dapatkan API key di https://aistudio.google.com/apikey"
+        details: "Pastikan CEREBRAS_API_KEY ada di file .env.local dan valid."
       };
     }
     
