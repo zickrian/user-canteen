@@ -16,6 +16,7 @@ Aplikasi web minimalis untuk mencari dan menemukan kantin terdaftar dengan desai
 - **TypeScript** - Type Safety
 - **Tailwind CSS 4** - Styling
 - **Supabase** - Database & Backend
+- **Cerebras AI (llama-3.3-70b)** - AI Chatbot
 - **Lucide React** - Icons
 
 ## 📦 Instalasi
@@ -31,7 +32,11 @@ Aplikasi web minimalis untuk mencari dan menemukan kantin terdaftar dengan desai
    ```
    SUPABASE_URL=https://krvehrwfaokhscsxjlsm.supabase.co
    SUPABASE_ANON_KEY=your_anon_key
+   CEREBRAS_API_KEY=your_cerebras_api_key
    ```
+   
+   **Catatan:** Aplikasi ini sekarang menggunakan Cerebras AI (model llama-3.3-70b) untuk chatbot. 
+   Dapatkan API key Cerebras di: https://cerebras.ai/
 
 4. Setup database di Supabase:
    - Buka Supabase Dashboard: https://supabase.com/dashboard/project/krvehrwfaokhscsxjlsm
