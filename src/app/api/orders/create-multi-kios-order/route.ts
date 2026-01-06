@@ -142,8 +142,8 @@ export async function POST(request: NextRequest) {
             email: customerDetails.email || 'customer@example.com',
             phone: customerDetails.nomor_meja || '-'
           },
-          // Menggunakan QRIS agar QR code selalu muncul (PC & HP)
-          enabled_payments: ['other_qris']
+          // Biarkan Midtrans tampilkan semua payment channel yang aktif
+          // enabled_payments tidak di-set agar semua channel muncul
         })
 
         // Return without creating actual orders - webhook will handle it
