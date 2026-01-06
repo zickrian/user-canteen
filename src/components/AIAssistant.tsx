@@ -361,12 +361,24 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
   }
 
   const handleAddComboToCart = (combo: ComboPackage) => {
-    const makananKantin = (combo.makanan as any).kantin || kantin
-    const minumanKantin = (combo.minuman as any).kantin || kantin
+    // Build kantin object from menu data (API returns kantin_id and nama_kantin directly on menu)
+    const makananData = combo.makanan as any
+    const minumanData = combo.minuman as any
+    
+    // Try to get kantin from nested object first, then from flat fields, then fallback to props
+    const makananKantin = makananData.kantin || (makananData.kantin_id ? {
+      id: makananData.kantin_id,
+      nama_kantin: makananData.nama_kantin || 'Unknown',
+    } : kantin)
+    
+    const minumanKantin = minumanData.kantin || (minumanData.kantin_id ? {
+      id: minumanData.kantin_id,
+      nama_kantin: minumanData.nama_kantin || 'Unknown',
+    } : kantin)
 
-    if (makananKantin && minumanKantin) {
-      addItem(combo.makanan, makananKantin)
-      addItem(combo.minuman, minumanKantin)
+    if (makananKantin?.id && minumanKantin?.id) {
+      addItem(combo.makanan, makananKantin as Kantin)
+      addItem(combo.minuman, minumanKantin as Kantin)
 
       const confirmationMessage: AIMessage = {
         id: Date.now().toString(),
@@ -376,6 +388,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       }
       setMessages((prev) => [...prev, confirmationMessage])
     } else {
+      console.error('Failed to add combo - missing kantin data:', { makananKantin, minumanKantin })
       const errorMessage: AIMessage = {
         id: Date.now().toString(),
         role: 'assistant',
