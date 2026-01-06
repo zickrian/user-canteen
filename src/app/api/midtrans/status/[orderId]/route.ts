@@ -44,22 +44,58 @@ export async function GET(
 
     if (pendingOrder) {
       // New flow: Check if order was processed (payment successful)
-      if (pendingOrder.status === 'processed' && midtransStatus === 'settlement') {
-        // Orders were created by webhook, find them
+      if (midtransStatus === 'settlement') {
+        // Payment successful - check if webhook already processed
+        if (pendingOrder.status === 'processed') {
+          // Orders were created by webhook, find them
+          const { data: payments } = await supabaseAdmin
+            .from('pembayaran')
+            .select('pesanan_id')
+            .eq('midtrans_order_id', orderId)
+
+          return NextResponse.json({
+            status: midtransStatus,
+            paymentStatus: paymentStatus,
+            orderId: transaction.order_id,
+            pesananIds: payments?.map(p => p.pesanan_id) || [],
+            grossAmount: transaction.gross_amount,
+            paymentType: transaction.payment_type,
+            transactionTime: transaction.transaction_time,
+            isPending: false
+          })
+        }
+        
+        // Webhook belum selesai - coba cari di pembayaran table (mungkin sudah dibuat)
         const { data: payments } = await supabaseAdmin
           .from('pembayaran')
           .select('pesanan_id')
           .eq('midtrans_order_id', orderId)
-
+        
+        if (payments && payments.length > 0) {
+          // Webhook sudah buat pesanan, return pesananIds
+          return NextResponse.json({
+            status: midtransStatus,
+            paymentStatus: paymentStatus,
+            orderId: transaction.order_id,
+            pesananIds: payments.map(p => p.pesanan_id),
+            grossAmount: transaction.gross_amount,
+            paymentType: transaction.payment_type,
+            transactionTime: transaction.transaction_time,
+            isPending: false
+          })
+        }
+        
+        // Webhook belum selesai, return dengan flag waitingWebhook
         return NextResponse.json({
           status: midtransStatus,
           paymentStatus: paymentStatus,
           orderId: transaction.order_id,
-          pesananIds: payments?.map(p => p.pesanan_id) || [],
+          pesananIds: [],
           grossAmount: transaction.gross_amount,
           paymentType: transaction.payment_type,
           transactionTime: transaction.transaction_time,
-          isPending: false
+          isPending: false,
+          waitingWebhook: true
         })
       }
 

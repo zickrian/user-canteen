@@ -96,11 +96,18 @@ export default function CheckoutPage() {
         pesananId?: string
         pesananIds?: string[]
         isPending?: boolean
+        waitingWebhook?: boolean
       }
 
       const status = data.status || ''
 
       if (status === 'settlement') {
+        // Kalau masih waiting webhook, jangan redirect dulu - tunggu poll berikutnya
+        if (data.waitingWebhook && (!data.pesananIds || data.pesananIds.length === 0)) {
+          console.log('Payment successful, waiting for webhook to create orders...')
+          return // Tunggu poll berikutnya
+        }
+        
         setPaymentStatus('success')
         
         // Clear cart immediately on success
