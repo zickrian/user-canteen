@@ -715,7 +715,7 @@ export async function POST(req: NextRequest) {
             const { data: { user } } = await supabase.auth.getUser()
             if (user) currentUserId = user.id
           }
-        } catch (e) {
+        } catch {
           // Ignore auth errors in development
         }
       }
@@ -739,9 +739,8 @@ export async function POST(req: NextRequest) {
     console.log(`[Chat] message="${trimmedMessage.substring(0, 50)}..." kantin_id=${kantin_id || 'global'} user_id=${currentUserId || 'anonymous'}`)
 
     // Get base URL for internal API calls
-    // Support: NEXT_PUBLIC_APP_URL (manual), RAILWAY_PUBLIC_DOMAIN (Railway), VERCEL_URL (Vercel)
+    // Support: NEXT_PUBLIC_APP_URL (manual), VERCEL_URL (Vercel)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
-      (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null) ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
     // ========== HANDLE SPECIAL CASES (no tool call needed) ==========
@@ -1059,7 +1058,7 @@ Berikan jawaban natural dan ramah berdasarkan data di atas.`
     }
 
     // No tool call needed - return direct response
-    let reply = cleanMarkdown((response as any).choices?.[0]?.message?.content || 'Maaf, saya tidak bisa memproses permintaan kamu.')
+    const reply = cleanMarkdown((response as any).choices?.[0]?.message?.content || 'Maaf, saya tidak bisa memproses permintaan kamu.')
 
     // FALLBACK: If we detected a kantin name but AI didn't call tool, force call the tool
     if (detectedKantinName && !reply.toLowerCase().includes('menu') && !reply.toLowerCase().includes('tidak ada')) {
@@ -1068,7 +1067,6 @@ Berikan jawaban natural dan ramah berdasarkan data di atas.`
       const fallbackResult = await executeToolCall('list_menu_by_kantin', { kantin_name: detectedKantinName }, baseUrl)
       
       if (fallbackResult.items && fallbackResult.items.length > 0) {
-        const menuList = fallbackResult.items.slice(0, 10).map(formatMenuItem).join('\n')
         const kantinName = fallbackResult.kantin?.nama_kantin || detectedKantinName
         
         return NextResponse.json({

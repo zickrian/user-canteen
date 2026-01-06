@@ -57,14 +57,21 @@ export default function LoginModal({
       const currentOrigin = window.location.origin
       const currentPathname = window.location.pathname
 
-      // STRICT allowlist - exact match only, no includes() to prevent false positives
+      // Production URL
+      const productionUrl = 'https://qmeal-one.vercel.app'
+
+      // STRICT allowlist - exact match only
       const ALLOWED_ORIGINS = [
         'http://localhost:3000',
         'http://127.0.0.1:3000',
-        'https://qmeal.up.railway.app',
+        productionUrl,
       ]
 
-      if (!ALLOWED_ORIGINS.includes(currentOrigin)) {
+      // Also allow Vercel preview deployments
+      const isVercelPreview = currentOrigin.includes('.vercel.app')
+      const isAllowed = ALLOWED_ORIGINS.includes(currentOrigin) || isVercelPreview
+
+      if (!isAllowed) {
         setError('Login hanya tersedia di aplikasi user, bukan admin')
         setIsLoading(false)
         return
@@ -77,10 +84,8 @@ export default function LoginModal({
       }
 
       // Build redirectTo with next parameter
-      // Base URL determined by current origin
-      const base = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')
-        ? 'http://localhost:3000'
-        : 'https://qmeal.up.railway.app'
+      // Use current origin for redirect
+      const base = currentOrigin
 
       const redirectTo = `${base}/auth/callback?next=${encodeURIComponent(currentPathname || '/')}`
 

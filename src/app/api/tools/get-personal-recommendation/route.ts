@@ -69,10 +69,9 @@ export async function POST(req: NextRequest) {
 
     // Extract menu IDs from history
     const menuFrequency: Record<string, number> = {}
-    const kantinFrequency: Record<string, number> = {}
     
     for (const order of orderHistory || []) {
-      for (const detail of (order.detail_pesanan || []) as any[]) {
+      for (const detail of (order.detail_pesanan || []) as { menu_id: string; jumlah?: number }[]) {
         const menuId = detail.menu_id
         const qty = detail.jumlah || 1
         menuFrequency[menuId] = (menuFrequency[menuId] || 0) + qty
@@ -110,7 +109,7 @@ export async function POST(req: NextRequest) {
     const frequentKantinIds = [...new Set((frequentMenus || []).map(m => m.kantin_id))]
 
     // Get similar menus from same kantins (that user hasn't ordered)
-    const { data: similarMenus, error: similarError } = await supabaseAdmin
+    const { data: similarMenus } = await supabaseAdmin
       .from('v_menu_stats')
       .select('*')
       .in('kantin_id', frequentKantinIds)
