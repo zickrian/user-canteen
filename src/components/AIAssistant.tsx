@@ -338,8 +338,27 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     // Gunakan kantin dari parameter (untuk menu global) atau kantin dari props
     const targetKantin = menuKantin || kantin
 
-    if (targetKantin) {
-      addItem(menu, targetKantin)
+    if (targetKantin && targetKantin.id) {
+      // Pastikan kantin object memiliki field yang diperlukan untuk cart grouping
+      // Cart hanya butuh id dan nama_kantin untuk grouping
+      const normalizedKantin: Kantin = {
+        id: targetKantin.id,
+        nama_kantin: targetKantin.nama_kantin || 'Unknown',
+        user_id: targetKantin.user_id || '',
+        status: targetKantin.status || 'aktif',
+        created_at: targetKantin.created_at || new Date().toISOString(),
+        updated_at: targetKantin.updated_at || new Date().toISOString(),
+        foto_profil: targetKantin.foto_profil || null,
+        jam_buka: targetKantin.jam_buka || null,
+        jam_tutup: targetKantin.jam_tutup || null,
+        buka_tutup: targetKantin.buka_tutup ?? true,
+        balance: targetKantin.balance || 0,
+        bank_name: targetKantin.bank_name || null,
+        account_number: targetKantin.account_number || null,
+        account_name: targetKantin.account_name || null,
+      }
+      
+      addItem(menu, normalizedKantin)
 
       const confirmationMessage: AIMessage = {
         id: Date.now().toString(),
@@ -366,19 +385,54 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     const minumanData = combo.minuman as any
     
     // Try to get kantin from nested object first, then from flat fields, then fallback to props
-    const makananKantin = makananData.kantin || (makananData.kantin_id ? {
+    const makananKantinRaw = makananData.kantin || (makananData.kantin_id ? {
       id: makananData.kantin_id,
       nama_kantin: makananData.nama_kantin || 'Unknown',
     } : kantin)
     
-    const minumanKantin = minumanData.kantin || (minumanData.kantin_id ? {
+    const minumanKantinRaw = minumanData.kantin || (minumanData.kantin_id ? {
       id: minumanData.kantin_id,
       nama_kantin: minumanData.nama_kantin || 'Unknown',
     } : kantin)
 
-    if (makananKantin?.id && minumanKantin?.id) {
-      addItem(combo.makanan, makananKantin as Kantin)
-      addItem(combo.minuman, minumanKantin as Kantin)
+    if (makananKantinRaw?.id && minumanKantinRaw?.id) {
+      // Normalize kantin objects to ensure consistent structure for cart grouping
+      const makananKantin: Kantin = {
+        id: makananKantinRaw.id,
+        nama_kantin: makananKantinRaw.nama_kantin || 'Unknown',
+        user_id: makananKantinRaw.user_id || '',
+        status: makananKantinRaw.status || 'aktif',
+        created_at: makananKantinRaw.created_at || new Date().toISOString(),
+        updated_at: makananKantinRaw.updated_at || new Date().toISOString(),
+        foto_profil: makananKantinRaw.foto_profil || null,
+        jam_buka: makananKantinRaw.jam_buka || null,
+        jam_tutup: makananKantinRaw.jam_tutup || null,
+        buka_tutup: makananKantinRaw.buka_tutup ?? true,
+        balance: makananKantinRaw.balance || 0,
+        bank_name: makananKantinRaw.bank_name || null,
+        account_number: makananKantinRaw.account_number || null,
+        account_name: makananKantinRaw.account_name || null,
+      }
+      
+      const minumanKantin: Kantin = {
+        id: minumanKantinRaw.id,
+        nama_kantin: minumanKantinRaw.nama_kantin || 'Unknown',
+        user_id: minumanKantinRaw.user_id || '',
+        status: minumanKantinRaw.status || 'aktif',
+        created_at: minumanKantinRaw.created_at || new Date().toISOString(),
+        updated_at: minumanKantinRaw.updated_at || new Date().toISOString(),
+        foto_profil: minumanKantinRaw.foto_profil || null,
+        jam_buka: minumanKantinRaw.jam_buka || null,
+        jam_tutup: minumanKantinRaw.jam_tutup || null,
+        buka_tutup: minumanKantinRaw.buka_tutup ?? true,
+        balance: minumanKantinRaw.balance || 0,
+        bank_name: minumanKantinRaw.bank_name || null,
+        account_number: minumanKantinRaw.account_number || null,
+        account_name: minumanKantinRaw.account_name || null,
+      }
+      
+      addItem(combo.makanan, makananKantin)
+      addItem(combo.minuman, minumanKantin)
 
       const confirmationMessage: AIMessage = {
         id: Date.now().toString(),
@@ -388,7 +442,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
       }
       setMessages((prev) => [...prev, confirmationMessage])
     } else {
-      console.error('Failed to add combo - missing kantin data:', { makananKantin, minumanKantin })
+      console.error('Failed to add combo - missing kantin data:', { makananKantinRaw, minumanKantinRaw })
       const errorMessage: AIMessage = {
         id: Date.now().toString(),
         role: 'assistant',
@@ -488,10 +542,15 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
   const renderMenuSuggestions = (menuSuggestions: Menu[]) => (
     <div className="space-y-2 mt-3">
       {menuSuggestions.map((menu) => {
-        const kantinInfo = (menu as any).kantin || (menu as any).nama_kantin ? { nama_kantin: (menu as any).nama_kantin } : null;
-        const isGlobalMenu = !kantin && kantinInfo;
-        const avgRating = (menu as any).avg_rating;
-        const ratingCount = (menu as any).rating_count;
+        const menuData = menu as any;
+        // Get kantin info - prioritize nested kantin object, then flat fields
+        const kantinInfo = menuData.kantin || (menuData.kantin_id ? { 
+          id: menuData.kantin_id, 
+          nama_kantin: menuData.nama_kantin || 'Unknown' 
+        } : null);
+        const isGlobalMenu = !kantin && kantinInfo?.id;
+        const avgRating = menuData.avg_rating;
+        const ratingCount = menuData.rating_count;
 
         return (
           <div
@@ -549,7 +608,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
                 <button
                   onClick={() => {
                     if (isGlobalMenu && kantinInfo) {
-                      handleAddToCart(menu, kantinInfo as any);
+                      handleAddToCart(menu, kantinInfo as Kantin);
                     } else {
                       handleAddToCart(menu);
                     }

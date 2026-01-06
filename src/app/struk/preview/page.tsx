@@ -377,16 +377,10 @@ function StrukPreviewContent() {
               </div>
             ) : (
               <div className="px-6 py-6 bg-amber-50 border-t border-amber-100">
-                <p className="text-xs text-amber-800 font-bold mb-3 flex items-center gap-2">
+                <p className="text-xs text-amber-800 font-bold flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  Instruksi Pembayaran Cash:
+                  Silakan bayar ke kasir
                 </p>
-                <ol className="text-xs text-amber-700 space-y-2 list-decimal list-inside font-medium leading-relaxed">
-                  <li>Kunjungi masing-masing kios untuk pembayaran</li>
-                  <li>Tunjukkan struk ini sebagai bukti pesanan</li>
-                  <li>Bayar sesuai subtotal di masing-masing kios</li>
-                  <li>Halaman ini akan update otomatis setelah pembayaran dikonfirmasi</li>
-                </ol>
               </div>
             )}
 
