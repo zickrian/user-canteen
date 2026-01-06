@@ -95,32 +95,46 @@ export default function CheckoutPage() {
         orderId?: string
         pesananId?: string
         pesananIds?: string[]
+        isPending?: boolean
       }
 
       const status = data.status || ''
 
       if (status === 'settlement') {
         setPaymentStatus('success')
+        
+        // Clear cart immediately on success
+        clearCart()
+        
         setTimeout(() => {
-          clearCart()
-          // For multi-kios, redirect to preview with orders
-          if (isMultiKios && multiKiosOrders.length > 0) {
+          // For new flow (isPending was true), orders are created by webhook
+          // Redirect to struk preview with payment info
+          if (data.pesananIds && data.pesananIds.length > 0) {
+            if (data.pesananIds.length > 1 || isMultiKios) {
+              // Multi-kios: redirect to preview
+              const ordersForPreview = data.pesananIds.map((id, idx) => ({
+                pesananId: id,
+                kantinId: kiosGroups[idx]?.kantin.id || '',
+                kantinName: kiosGroups[idx]?.kantin.nama_kantin || '',
+                subtotal: kiosGroups[idx]?.subtotal || 0
+              }))
+              router.push(`/struk/preview?orders=${encodeURIComponent(JSON.stringify(ordersForPreview))}&paymentMethod=qris&paid=true&email=${encodeURIComponent(formData.email)}`)
+            } else {
+              // Single kios: redirect to struk
+              router.push(`/struk/${data.pesananIds[0]}`)
+            }
+          } else if (multiKiosOrders.length > 0) {
+            // Fallback to multiKiosOrders if available (old flow)
             router.push(`/struk/preview?orders=${encodeURIComponent(JSON.stringify(multiKiosOrders))}&paymentMethod=qris&paid=true&email=${encodeURIComponent(formData.email)}`)
           } else {
-            // Untuk single kios, ambil pesananId dari response Midtrans status API
-            const pesananId =
-              (Array.isArray(data.pesananIds) && data.pesananIds[0]) ||
-              data.pesananId
-
-            if (pesananId) {
-              router.push(`/struk/${pesananId}`)
-            } else {
-              console.error('Pesanan ID tidak ditemukan di response Midtrans status', data)
-            }
+            // Last resort: redirect to home with success message
+            console.log('Payment successful but no order IDs found, redirecting to home')
+            router.push('/?paymentSuccess=true')
           }
         }, 2000)
       } else if (['expire', 'cancel', 'deny'].includes(status)) {
         setPaymentStatus('failed')
+        // Cart is NOT cleared on failure - user can try again
       }
     } catch (error) {
       console.error('Error checking payment status:', error)

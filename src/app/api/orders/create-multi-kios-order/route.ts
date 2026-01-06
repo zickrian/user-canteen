@@ -85,9 +85,82 @@ export async function POST(request: NextRequest) {
     }
 
     const createdOrders: { pesananId: string; kantinId: string; kantinName: string; subtotal: number }[] = []
-    const midtransOrderId = `MULTI-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const midtransOrderId = `MULTI-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 
-    // Create separate orders for each kios
+    // For QRIS: Don't create order yet, just create Midtrans transaction
+    // Order will be created by webhook after payment success
+    if (paymentMethod === 'qris') {
+      // Flatten all items for Midtrans
+      const allItems = kiosOrders.flatMap(kiosOrder => 
+        kiosOrder.items.map(item => ({
+          id: item.menu.id,
+          price: item.menu.harga,
+          quantity: item.quantity,
+          name: `${item.menu.nama_menu} (${kiosOrder.kantinName})`,
+          category: item.menu.kategori_menu?.[0] || 'Makanan'
+        }))
+      )
+
+      // Save pending order data to a temporary table for webhook to process
+      const { error: pendingError } = await supabaseAdmin
+        .from('pending_qris_orders')
+        .insert({
+          midtrans_order_id: midtransOrderId,
+          order_data: JSON.stringify({
+            kiosOrders,
+            customerDetails,
+            grossAmount,
+            userId: validUserId
+          }),
+          status: 'pending',
+          created_at: new Date().toISOString()
+        })
+
+      if (pendingError) {
+        console.error('Error saving pending order:', pendingError)
+        // Fallback: create order immediately if pending table doesn't exist
+        // This maintains backward compatibility
+        if (pendingError.code === '42P01') { // Table doesn't exist
+          console.log('pending_qris_orders table not found, creating orders immediately')
+          // Continue with old flow below
+        } else {
+          return NextResponse.json(
+            { error: `Gagal menyimpan data pesanan: ${pendingError.message}` },
+            { status: 500 }
+          )
+        }
+      } else {
+        // Successfully saved to pending table, create Midtrans transaction
+        const transaction = await (snap as any).createTransaction({
+          transaction_details: {
+            order_id: midtransOrderId,
+            gross_amount: grossAmount
+          },
+          item_details: allItems,
+          customer_details: {
+            first_name: customerDetails.nama_pelanggan || 'Pelanggan',
+            email: customerDetails.email || 'customer@example.com',
+            phone: customerDetails.nomor_meja || '-'
+          },
+          // Menggunakan QRIS agar QR code selalu muncul (PC & HP)
+          enabled_payments: ['other_qris']
+        })
+
+        // Return without creating actual orders - webhook will handle it
+        return NextResponse.json({
+          success: true,
+          orders: [], // Empty for now, will be created after payment
+          midtransOrderId,
+          totalAmount: grossAmount,
+          token: transaction.token,
+          redirect_url: transaction.redirect_url,
+          isPending: true, // Flag to indicate orders not yet created
+          message: `Silakan scan QRIS untuk pembayaran. Pesanan akan dibuat setelah pembayaran berhasil.`
+        })
+      }
+    }
+
+    // For CASH or fallback QRIS (if pending table doesn't exist): Create orders immediately
     for (const kiosOrder of kiosOrders) {
       const pesananId = crypto.randomUUID()
 
@@ -152,7 +225,7 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Save payment record based on payment method
+      // Save payment record for cash
       if (paymentMethod === 'cash') {
         const { error: paymentError } = await supabaseAdmin
           .from('pembayaran_cash')
@@ -173,29 +246,6 @@ export async function POST(request: NextRequest) {
             { status: 500 }
           )
         }
-      } else {
-        // QRIS - save to pembayaran table with shared midtrans order id
-        const { error: paymentError } = await supabaseAdmin
-          .from('pembayaran')
-          .insert({
-            pesanan_id: pesananId,
-            midtrans_order_id: midtransOrderId,
-            gross_amount: kiosOrder.subtotal,
-            payment_type: 'qris',
-            status: 'pending',
-            email_pelanggan: customerDetails.email,
-            nomor_meja: customerDetails.nomor_meja,
-            tipe_pesanan: customerDetails.tipe_pesanan,
-            payer_id: validUserId
-          })
-
-        if (paymentError) {
-          console.error('Error saving qris payment record:', paymentError)
-          return NextResponse.json(
-            { error: `Gagal menyimpan record pembayaran untuk ${kiosOrder.kantinName}: ${paymentError.message}` },
-            { status: 500 }
-          )
-        }
       }
 
       createdOrders.push({
@@ -203,45 +253,6 @@ export async function POST(request: NextRequest) {
         kantinId: kiosOrder.kantinId,
         kantinName: kiosOrder.kantinName,
         subtotal: kiosOrder.subtotal
-      })
-    }
-
-    // For QRIS, create Midtrans transaction
-    if (paymentMethod === 'qris') {
-      // Flatten all items for Midtrans
-      const allItems = kiosOrders.flatMap(kiosOrder => 
-        kiosOrder.items.map(item => ({
-          id: item.menu.id,
-          price: item.menu.harga,
-          quantity: item.quantity,
-          name: `${item.menu.nama_menu} (${kiosOrder.kantinName})`,
-          category: item.menu.kategori_menu?.[0] || 'Makanan'
-        }))
-      )
-
-      const transaction = await (snap as any).createTransaction({
-        transaction_details: {
-          order_id: midtransOrderId,
-          gross_amount: grossAmount
-        },
-        item_details: allItems,
-        customer_details: {
-          first_name: customerDetails.nama_pelanggan || 'Pelanggan',
-          email: customerDetails.email || 'customer@example.com',
-          phone: customerDetails.nomor_meja || '-'
-        },
-        // Menggunakan QRIS agar QR code selalu muncul (PC & HP)
-        enabled_payments: ['other_qris']
-      })
-
-      return NextResponse.json({
-        success: true,
-        orders: createdOrders,
-        midtransOrderId,
-        totalAmount: grossAmount,
-        token: transaction.token,
-        redirect_url: transaction.redirect_url,
-        message: `${createdOrders.length} pesanan berhasil dibuat. Silakan scan QRIS untuk pembayaran.`
       })
     }
 

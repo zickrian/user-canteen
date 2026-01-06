@@ -25,8 +25,58 @@ export async function GET(
 
     // Get transaction status from Midtrans using the midtrans order ID
     const transaction = await (snap as any).transaction.status(orderId)
+    const midtransStatus = transaction.transaction_status
 
-    // Find all payments by midtrans order ID (can be multi-kios)
+    // Map Midtrans status to our payment status
+    let paymentStatus = 'pending'
+    if (midtransStatus === 'settlement') {
+      paymentStatus = 'settlement'
+    } else if (['expire', 'cancel', 'deny'].includes(midtransStatus)) {
+      paymentStatus = midtransStatus
+    }
+
+    // First check if this is a pending order (new flow - orders created after payment)
+    const { data: pendingOrder } = await supabaseAdmin
+      .from('pending_qris_orders')
+      .select('*')
+      .eq('midtrans_order_id', orderId)
+      .single()
+
+    if (pendingOrder) {
+      // New flow: Check if order was processed (payment successful)
+      if (pendingOrder.status === 'processed' && midtransStatus === 'settlement') {
+        // Orders were created by webhook, find them
+        const { data: payments } = await supabaseAdmin
+          .from('pembayaran')
+          .select('pesanan_id')
+          .eq('midtrans_order_id', orderId)
+
+        return NextResponse.json({
+          status: midtransStatus,
+          paymentStatus: paymentStatus,
+          orderId: transaction.order_id,
+          pesananIds: payments?.map(p => p.pesanan_id) || [],
+          grossAmount: transaction.gross_amount,
+          paymentType: transaction.payment_type,
+          transactionTime: transaction.transaction_time,
+          isPending: false
+        })
+      }
+
+      // Still pending or cancelled/expired
+      return NextResponse.json({
+        status: midtransStatus,
+        paymentStatus: paymentStatus,
+        orderId: transaction.order_id,
+        pesananIds: [],
+        grossAmount: transaction.gross_amount,
+        paymentType: transaction.payment_type,
+        transactionTime: transaction.transaction_time,
+        isPending: pendingOrder.status === 'pending'
+      })
+    }
+
+    // Old flow: Find payments by midtrans order ID (can be multi-kios)
     const { data: payments, error: paymentFetchError } = await supabaseAdmin
       .from('pembayaran')
       .select('pesanan_id, status')
@@ -38,15 +88,6 @@ export async function GET(
         { error: 'Payment record not found' },
         { status: 404 }
       )
-    }
-    const midtransStatus = transaction.transaction_status
-
-    // Map Midtrans status to our payment status
-    let paymentStatus = 'pending'
-    if (midtransStatus === 'settlement') {
-      paymentStatus = 'settlement'
-    } else if (['expire', 'cancel', 'deny'].includes(midtransStatus)) {
-      paymentStatus = midtransStatus
     }
 
     // Update payment record

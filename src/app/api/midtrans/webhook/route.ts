@@ -2,6 +2,35 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import crypto from 'crypto'
 
+type KiosOrder = {
+  kantinId: string
+  kantinName: string
+  items: {
+    menu: {
+      id: string
+      nama_menu: string
+      harga: number
+    }
+    quantity: number
+  }[]
+  subtotal: number
+}
+
+type CustomerDetails = {
+  nama_pelanggan: string
+  email: string
+  nomor_meja: string
+  tipe_pesanan: 'dine_in' | 'take_away'
+  catatan_pesanan?: string
+}
+
+type PendingOrderData = {
+  kiosOrders: KiosOrder[]
+  customerDetails: CustomerDetails
+  grossAmount: number
+  userId: string | null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text()
@@ -22,7 +51,140 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Find payment record(s) by midtrans order id (multi-kios friendly)
+    console.log(`[Webhook] Received notification for order ${order_id}: ${transaction_status}`)
+
+    // Check if this is a pending QRIS order (new flow)
+    const { data: pendingOrder, error: pendingError } = await supabaseAdmin
+      .from('pending_qris_orders')
+      .select('*')
+      .eq('midtrans_order_id', order_id)
+      .eq('status', 'pending')
+      .single()
+
+    if (pendingOrder && !pendingError) {
+      // New flow: Order was not created yet, handle based on payment status
+      console.log(`[Webhook] Found pending order for ${order_id}`)
+
+      if (transaction_status === 'settlement') {
+        // Payment successful - create the actual orders now
+        const orderData: PendingOrderData = JSON.parse(pendingOrder.order_data)
+        const { kiosOrders, customerDetails, userId } = orderData
+
+        const createdOrders: { pesananId: string; kantinId: string; kantinName: string; subtotal: number }[] = []
+
+        for (const kiosOrder of kiosOrders) {
+          const pesananId = crypto.randomUUID()
+
+          // Get next sequential nomor antrian for this kantin
+          const { data: nomorAntrianData, error: nomorAntrianError } = await supabaseAdmin
+            .rpc('get_next_nomor_antrian', { p_kantin_id: kiosOrder.kantinId })
+
+          if (nomorAntrianError) {
+            console.error('Error getting nomor antrian:', nomorAntrianError)
+            continue
+          }
+
+          const nomorAntrian = nomorAntrianData || 1
+
+          // Create order in pesanan table
+          const { error: orderError } = await supabaseAdmin
+            .from('pesanan')
+            .insert({
+              id: pesananId,
+              kantin_id: kiosOrder.kantinId,
+              nomor_antrian: nomorAntrian,
+              nama_pemesan: customerDetails.nama_pelanggan || 'Pelanggan',
+              catatan: customerDetails.catatan_pesanan || null,
+              email: customerDetails.email || null,
+              nomor_meja: customerDetails.nomor_meja || null,
+              tipe_pesanan: customerDetails.tipe_pesanan || null,
+              total_harga: kiosOrder.subtotal,
+              status: 'diproses', // Already paid, so set to diproses
+              user_id: userId,
+              payment_method: 'qris'
+            })
+
+          if (orderError) {
+            console.error('Error creating order:', orderError)
+            continue
+          }
+
+          // Create order details
+          const detailPesanan = kiosOrder.items.map((item) => ({
+            pesanan_id: pesananId,
+            menu_id: item.menu.id,
+            jumlah: item.quantity,
+            harga_satuan: item.menu.harga,
+            subtotal: item.menu.harga * item.quantity
+          }))
+
+          const { error: detailError } = await supabaseAdmin
+            .from('detail_pesanan')
+            .insert(detailPesanan)
+
+          if (detailError) {
+            console.error('Error creating order details:', detailError)
+          }
+
+          // Create payment record
+          const { error: paymentError } = await supabaseAdmin
+            .from('pembayaran')
+            .insert({
+              pesanan_id: pesananId,
+              midtrans_order_id: order_id,
+              midtrans_transaction_id: notification.transaction_id,
+              gross_amount: kiosOrder.subtotal,
+              payment_type: 'qris',
+              status: 'settlement',
+              email_pelanggan: customerDetails.email,
+              nomor_meja: customerDetails.nomor_meja,
+              tipe_pesanan: customerDetails.tipe_pesanan,
+              payer_id: userId
+            })
+
+          if (paymentError) {
+            console.error('Error creating payment record:', paymentError)
+          }
+
+          createdOrders.push({
+            pesananId,
+            kantinId: kiosOrder.kantinId,
+            kantinName: kiosOrder.kantinName,
+            subtotal: kiosOrder.subtotal
+          })
+        }
+
+        // Mark pending order as processed
+        await supabaseAdmin
+          .from('pending_qris_orders')
+          .update({ 
+            status: 'processed',
+            processed_at: new Date().toISOString()
+          })
+          .eq('id', pendingOrder.id)
+
+        console.log(`[Webhook] Created ${createdOrders.length} orders for ${order_id}`)
+        return NextResponse.json({ success: true, orders: createdOrders })
+
+      } else if (['cancel', 'expire', 'deny'].includes(transaction_status)) {
+        // Payment failed/cancelled - just mark pending order as cancelled
+        await supabaseAdmin
+          .from('pending_qris_orders')
+          .update({ 
+            status: transaction_status === 'expire' ? 'expired' : 'cancelled',
+            processed_at: new Date().toISOString()
+          })
+          .eq('id', pendingOrder.id)
+
+        console.log(`[Webhook] Marked pending order ${order_id} as ${transaction_status}`)
+        return NextResponse.json({ success: true })
+      }
+
+      // For pending status, just acknowledge
+      return NextResponse.json({ success: true })
+    }
+
+    // Old flow: Orders were already created, find them by midtrans_order_id
     const { data: payments, error: paymentFetchError } = await supabaseAdmin
       .from('pembayaran')
       .select('pesanan_id')
