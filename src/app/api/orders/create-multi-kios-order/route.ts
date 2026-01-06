@@ -230,8 +230,8 @@ export async function POST(request: NextRequest) {
           email: customerDetails.email || 'customer@example.com',
           phone: customerDetails.nomor_meja || '-'
         },
-        // Menggunakan GoPay agar QR dari GoPay langsung muncul di Snap
-        enabled_payments: ['gopay']
+        // Menggunakan QRIS agar QR code selalu muncul (PC & HP)
+        enabled_payments: ['other_qris']
       })
 
       return NextResponse.json({
