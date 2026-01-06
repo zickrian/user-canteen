@@ -142,8 +142,8 @@ export async function POST(request: NextRequest) {
             email: customerDetails.email || 'customer@example.com',
             phone: customerDetails.nomor_meja || '-'
           },
-          // Menggunakan QRIS - bisa di-scan pakai e-wallet apapun (GoPay, OVO, Dana, dll)
-          enabled_payments: ['qris']
+          // Menggunakan QRIS
+          enabled_payments: ['other_qris']
         })
 
         // Return without creating actual orders - webhook will handle it

@@ -102,8 +102,8 @@ export async function POST(request: NextRequest) {
       },
       item_details: itemDetails,
       customer_details: customerDetails,
-      // Menggunakan QRIS - bisa di-scan pakai e-wallet apapun (GoPay, OVO, Dana, dll)
-      enabled_payments: ['qris']
+      // Menggunakan QRIS
+      enabled_payments: ['other_qris']
     })
 
     // Return tanpa membuat pesanan - webhook akan handle setelah pembayaran berhasil
