@@ -63,6 +63,13 @@ ROUTER LAINNYA:
 - "jam buka kantin X / kantin X buka?" → get_kantin_info
 - "hai/halo" → TIDAK panggil tool, jawab langsung
 
+PENTING - CARI MENU SPESIFIK:
+- "ada ga menu X" / "ada menu X ga" / "menu X ada?" / "cari X" → search_menu(query: "X")
+- Contoh: "ada ga menu ramen" → search_menu(query: "ramen")
+- Contoh: "ada nasi goreng ga" → search_menu(query: "nasi goreng")
+- Contoh: "cari miso" → search_menu(query: "miso")
+- SELALU panggil search_menu untuk pertanyaan tentang ketersediaan menu!
+
 PENTING - MENU TERLARIS/POPULER:
 - "menu terlaris" / "menu paling laris" / "best seller" (TANPA menyebut kios) → get_popular_menu() TANPA parameter kantin_name (ranking GLOBAL dari semua kios)
 - "menu terlaris di kios X" / "best seller di X" → get_popular_menu(kantin_name: "X") (ranking per kios)
@@ -592,6 +599,36 @@ function isKantinMenuQuery(msg: string): boolean {
 }
 
 /**
+ * Check if message is asking about specific menu item
+ * Returns the menu keyword if detected
+ */
+function extractMenuQuery(msg: string): string | null {
+  const lowerMsg = msg.toLowerCase().trim()
+  
+  // Patterns for menu queries like "ada ga menu ramen", "ada menu nasi goreng ga", "menu ramen ada?"
+  const patterns = [
+    /(?:ada\s+(?:ga|gak|tidak|nggak|ngga)?\s*)?menu\s+(.+?)(?:\s+(?:ga|gak|tidak|nggak|ngga|ada|\?))?$/i,
+    /(?:ada\s+(?:ga|gak|tidak|nggak|ngga)?\s*)(.+?)(?:\s+(?:ga|gak|tidak|nggak|ngga|\?))?$/i,
+    /(?:cari|mau|pengen|ingin)\s+(.+?)$/i,
+    /(.+?)\s+(?:ada\s+(?:ga|gak|tidak|nggak|ngga)?|tersedia)$/i,
+  ]
+  
+  for (const pattern of patterns) {
+    const match = lowerMsg.match(pattern)
+    if (match && match[1]) {
+      const query = match[1].trim()
+      // Filter out common words
+      const excludeWords = ['apa', 'yang', 'dong', 'ya', 'nih', 'menu', 'makanan', 'minuman', 'termurah', 'termahal', 'populer', 'laris', 'enak', 'terbaik', 'ga', 'gak', 'tidak', 'ada']
+      if (!excludeWords.includes(query) && query.length > 2) {
+        return query
+      }
+    }
+  }
+  
+  return null
+}
+
+/**
  * Generate quick reply buttons based on context
  */
 function generateQuickReplies(context: 'ambiguous' | 'menu_shown' | 'empty_result' | 'greeting'): string[] {
@@ -819,6 +856,16 @@ JANGAN bilang "tidak tersedia" sebelum memanggil tool!`
       kantinHint = `\n\nHINT: User sepertinya bertanya tentang menu dari kantin tertentu. Coba ekstrak nama kantin dari pesan dan gunakan list_menu_by_kantin.`
     }
 
+    // Check if this is a specific menu query (e.g., "ada ga menu ramen")
+    const menuQuery = extractMenuQuery(trimmedMessage)
+    let menuQueryHint = ''
+    if (menuQuery) {
+      menuQueryHint = `\n\nHINT PENTING: User mencari menu "${menuQuery}". 
+WAJIB gunakan tool search_menu dengan parameter query: "${menuQuery}" untuk mencari menu tersebut.
+JANGAN bilang "tidak ada" atau "tidak tersedia" sebelum memanggil tool!`
+      console.log(`[Chat] Detected menu query: "${menuQuery}"`)
+    }
+
     // Add user context for personal recommendation
     let userContext = ''
     if (currentUserId) {
@@ -827,7 +874,7 @@ JANGAN bilang "tidak tersedia" sebelum memanggil tool!`
       userContext = `\n\nUSER CONTEXT: User belum login atau anonymous. Jika user minta rekomendasi personal, beritahu untuk login dulu.`
     }
 
-    const fullPrompt = `${SYSTEM_PROMPT}${kantinContext}${conversationContext}${kantinHint}${userContext}
+    const fullPrompt = `${SYSTEM_PROMPT}${kantinContext}${conversationContext}${kantinHint}${menuQueryHint}${userContext}
 
 User: "${trimmedMessage}"
 
@@ -1080,8 +1127,36 @@ Berikan jawaban natural dan ramah berdasarkan data di atas.`
         })
       } else {
         return NextResponse.json({
-          reply: `Maaf, tidak ada menu yang ditemukan dari "${detectedKantinName}". Mungkin nama kantinnya berbeda? Coba cek daftar kantin ya! 🙏`,
+          reply: `Hmm, kayaknya "${detectedKantinName}" belum ada di daftar kantin kami. Mau lihat kantin yang tersedia? 😊`,
           quickReplies: ['List semua kantin', 'Menu populer', 'Rekomendasi'],
+        })
+      }
+    }
+
+    // FALLBACK: If we detected a menu query but AI didn't call tool, force search
+    if (menuQuery) {
+      console.log('[Chat] Fallback: AI didnt call tool for menu query, forcing search_menu')
+      
+      const fallbackResult = await executeToolCall('search_menu', { query: menuQuery }, baseUrl)
+      
+      if (fallbackResult.items && fallbackResult.items.length > 0) {
+        const menuList = fallbackResult.items.slice(0, 5).map((item: any) => 
+          `• ${item.nama_menu} - Rp${Number(item.harga).toLocaleString('id-ID')} [${item.nama_kantin}]`
+        ).join('\n')
+        
+        return NextResponse.json({
+          reply: `Ada ${fallbackResult.count} menu "${menuQuery}" yang tersedia! 🍽️\n\n${menuList}`,
+          menuData: fallbackResult.items.slice(0, 10),
+          quickReplies: generateQuickReplies('menu_shown'),
+          debug: {
+            toolsCalled: ['search_menu (fallback)'],
+            menuCount: fallbackResult.items.length,
+          },
+        })
+      } else {
+        return NextResponse.json({
+          reply: `Hmm, menu "${menuQuery}" belum ada nih. Tapi tenang, ada banyak menu enak lainnya! Mau coba lihat menu populer atau rekomendasi? 😊`,
+          quickReplies: ['Menu populer', 'Menu termurah', 'Rekomendasi paket'],
         })
       }
     }
