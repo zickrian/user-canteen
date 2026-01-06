@@ -67,12 +67,15 @@ export default function LoginModal({
         productionUrl,
       ]
 
-      // Also allow Vercel preview deployments
-      const isVercelPreview = currentOrigin.includes('.vercel.app')
+      // Also allow Vercel preview deployments (any .vercel.app domain)
+      const isVercelPreview = currentOrigin.endsWith('.vercel.app')
       const isAllowed = ALLOWED_ORIGINS.includes(currentOrigin) || isVercelPreview
 
+      // Debug log
+      console.log('[LoginModal] Origin check:', { currentOrigin, isAllowed, isVercelPreview })
+
       if (!isAllowed) {
-        setError('Login hanya tersedia di aplikasi user, bukan admin')
+        setError(`Login hanya tersedia di aplikasi resmi. Origin: ${currentOrigin}`)
         setIsLoading(false)
         return
       }
