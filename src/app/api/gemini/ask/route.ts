@@ -1,6 +1,6 @@
 /**
  * AI Assistant API Route dengan Function Calling
- * Route ini menggunakan Gemini AI dengan function calling untuk
+ * Route ini menggunakan Cerebras AI (Llama-3.3-70b) dengan function calling untuk
  * berinteraksi langsung dengan database melalui MCP (Model Context Protocol)
  */
 
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     console.log('Message:', message)
     console.log('KantinId:', kantinId)
 
-    // Convert Gemini tools to OpenAI format
+    // Convert tools to OpenAI format (required by Cerebras API)
     const openaiTools = tools.functionDeclarations.map((tool: any) => ({
       type: 'function',
       function: {
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
         parameters: tool.parametersJsonSchema,
       }
     }));
-    
+
     const firstRequest = await cerebras.chat.completions.create({
       model: 'llama-3.3-70b',
       messages: [
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       console.log('Tool args:', toolCall.function.arguments)
 
       const args = JSON.parse(toolCall.function.arguments || '{}') as Record<string, any>
-      
+
       // Inject kantinId dari context jika tidak ada di args tapi ada di request
       if (kantinId && !args.kantin_id) {
         args.kantin_id = kantinId
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 
       try {
         console.log('Executing tool with kantinId:', args.kantin_id || kantinId)
-        
+
         if (useFallback || !mcp || !sqlToolName) {
           // Use direct database fallback
           console.log('Using direct database fallback...')
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
         console.error('Tool execution error:', toolError)
         console.error('Error details:', toolError.message)
         console.error('Error stack:', toolError.stack)
-        
+
         // Try fallback if MCP failed
         if (!useFallback) {
           console.log('Retrying with direct database fallback...')
@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
 
       // STEP 3: Kirim hasil tool ke Cerebras untuk generate jawaban final
       console.log('Step 3: Generating final response...')
-      
+
       // Normalize tool result untuk response
       let normalizedResult = toolResult
       if (toolResult?.bundles) {
@@ -182,34 +182,39 @@ export async function POST(req: NextRequest) {
         // Jika bukan array, wrap dalam array
         normalizedResult = [toolResult]
       }
-      
+
       // Cek apakah tool result ada data
-      const hasData = Array.isArray(normalizedResult) 
-        ? normalizedResult.length > 0 
+      const hasData = Array.isArray(normalizedResult)
+        ? normalizedResult.length > 0
         : (normalizedResult && typeof normalizedResult === 'object' && !normalizedResult.error)
-      
-      const dataInstruction = hasData 
+
+      const dataInstruction = hasData
         ? '\n\nPENTING: Tool telah mengembalikan data. Data TIDAK kosong. LANGSUNG jawab dengan data tersebut sesuai pertanyaan user. JANGAN bilang "tidak ada jawaban" atau "maaf tidak ada jawaban" karena ada data. Gunakan data tersebut untuk menjawab pertanyaan user dengan tepat.'
         : '\n\nPENTING: Tool mengembalikan data kosong atau tidak ada data. Katakan "tidak ada" atau "belum ada menu yang sesuai" dengan sopan.'
-      
+
       const secondRequest = await cerebras.chat.completions.create({
         model: 'llama-3.3-70b',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: `User: ${message}\n\nKantin ID: ${kantinId || 'global'}${dataInstruction}` },
-          { 
+          {
             role: 'assistant',
-            content: null,
-            tool_calls: [toolCall]
+            content: '',
+            tool_calls: [{
+              id: toolCall.id,
+              type: 'function',
+              function: {
+                name: toolCall.function.name,
+                arguments: toolCall.function.arguments
+              }
+            }]
           },
           {
             role: 'tool',
-            content: JSON.stringify({ result: toolResult }),
+            content: JSON.stringify(toolResult),
             tool_call_id: toolCall.id
           }
         ],
-        tools: openaiTools,
-        tool_choice: 'auto',
         temperature: 0.4,
         max_completion_tokens: 900,
         stream: false
@@ -250,11 +255,11 @@ export async function POST(req: NextRequest) {
     console.error('AI API Error:', error)
     console.error('Error message:', error.message)
     console.error('Error stack:', error.stack)
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Gagal memproses AI, silakan coba lagi',
-        details: error.message 
+        details: error.message
       },
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )

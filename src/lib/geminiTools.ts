@@ -1,5 +1,5 @@
 /**
- * Gemini Function Calling Tools
+ * Cerebras Function Calling Tools
  * Simplified to 4 core functions that use MCP for direct database access
  */
 

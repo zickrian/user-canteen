@@ -28,6 +28,8 @@ export async function POST(req: NextRequest) {
       limit = 10,
     } = params
 
+    console.log('[list_menu_by_kantin] Params:', { kantin_id, kantin_name, only_available, sort, limit })
+
     let dbQuery = supabaseAdmin
       .from('v_menu_stats')
       .select('*')
@@ -36,6 +38,12 @@ export async function POST(req: NextRequest) {
     if (kantin_id) {
       dbQuery = dbQuery.eq('kantin_id', kantin_id)
     } else if (kantin_name) {
+      // Use more flexible search - try exact match first, then fuzzy
+      // Clean up the kantin name for better matching
+      const cleanName = kantin_name.trim().toLowerCase()
+      console.log('[list_menu_by_kantin] Searching for kantin:', cleanName)
+      
+      // Use ilike for case-insensitive partial match
       dbQuery = dbQuery.ilike('nama_kantin', `%${kantin_name}%`)
     }
 
@@ -70,6 +78,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    console.log('[list_menu_by_kantin] Found:', data?.length || 0, 'items')
+
     // Get kantin name from first result if available
     const kantinInfo = data && data.length > 0 ? {
       kantin_id: data[0].kantin_id,
@@ -80,6 +90,7 @@ export async function POST(req: NextRequest) {
       kantin: kantinInfo,
       items: data || [],
       count: data?.length || 0,
+      search_term: kantin_name || kantin_id || null,
     })
   } catch (error: any) {
     console.error('[list_menu_by_kantin] Unexpected error:', error)

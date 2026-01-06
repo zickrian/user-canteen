@@ -44,7 +44,7 @@ export async function generateContent(prompt: string, kantinId: string) {
     console.log('Message:', prompt);
     console.log('KantinId:', kantinId);
 
-    // Convert Gemini tools to OpenAI format
+    // Convert tools to OpenAI format (required by Cerebras API)
     const openaiTools = tools.functionDeclarations.map((tool: any) => ({
       type: 'function',
       function: {
@@ -53,7 +53,7 @@ export async function generateContent(prompt: string, kantinId: string) {
         parameters: tool.parametersJsonSchema,
       }
     }));
-    
+
     const firstRequest = await cerebras.chat.completions.create({
       model: modelName,
       messages: [
@@ -76,7 +76,7 @@ export async function generateContent(prompt: string, kantinId: string) {
       console.log('Tool args:', toolCall.function.arguments);
 
       const args = JSON.parse(toolCall.function.arguments || '{}');
-      
+
       // Inject kantinId dari context jika tidak ada di args tapi ada di parameter
       if (kantinId && !args.kantin_id) {
         args.kantin_id = kantinId;
@@ -86,7 +86,7 @@ export async function generateContent(prompt: string, kantinId: string) {
 
       try {
         console.log('Executing tool with kantinId:', args.kantin_id || kantinId);
-        
+
         if (useFallback || !mcp || !sqlToolName) {
           // Use direct database fallback
           console.log('Using direct database fallback...');
@@ -109,7 +109,7 @@ export async function generateContent(prompt: string, kantinId: string) {
         console.error('Tool execution error:', toolError);
         console.error('Error details:', toolError.message);
         console.error('Error stack:', toolError.stack);
-        
+
         // Try fallback if MCP failed
         if (!useFallback) {
           console.log('Retrying with direct database fallback...');
@@ -130,7 +130,7 @@ export async function generateContent(prompt: string, kantinId: string) {
 
       // STEP 3: Kirim hasil tool ke Cerebras untuk generate jawaban final
       console.log('Step 3: Generating final response...');
-      
+
       // Normalize tool result untuk response
       let normalizedResult = toolResult;
       if (toolResult?.bundles) {
@@ -144,34 +144,39 @@ export async function generateContent(prompt: string, kantinId: string) {
         // Jika bukan array, wrap dalam array
         normalizedResult = [toolResult];
       }
-      
+
       // Cek apakah tool result ada data
-      const hasData = Array.isArray(normalizedResult) 
-        ? normalizedResult.length > 0 
+      const hasData = Array.isArray(normalizedResult)
+        ? normalizedResult.length > 0
         : (normalizedResult && typeof normalizedResult === 'object' && !normalizedResult.error);
-      
-      const dataInstruction = hasData 
+
+      const dataInstruction = hasData
         ? '\n\nPENTING: Tool telah mengembalikan data. Data TIDAK kosong. LANGSUNG jawab dengan data tersebut sesuai pertanyaan user. JANGAN bilang "tidak ada jawaban" atau "maaf tidak ada jawaban" karena ada data. Gunakan data tersebut untuk menjawab pertanyaan user dengan tepat.'
         : '\n\nPENTING: Tool mengembalikan data kosong atau tidak ada data. Katakan "tidak ada" atau "belum ada menu yang sesuai" dengan sopan.';
-      
+
       const secondRequest = await cerebras.chat.completions.create({
         model: modelName,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: `User: ${prompt}\n\nKantin ID: ${kantinId || 'global'}${dataInstruction}` },
-          { 
+          {
             role: 'assistant',
-            content: null,
-            tool_calls: [toolCall]
+            content: '',
+            tool_calls: [{
+              id: toolCall.id,
+              type: 'function',
+              function: {
+                name: toolCall.function.name,
+                arguments: toolCall.function.arguments
+              }
+            }]
           },
           {
             role: 'tool',
-            content: JSON.stringify({ result: toolResult }),
+            content: JSON.stringify(toolResult),
             tool_call_id: toolCall.id
           }
         ],
-        tools: openaiTools,
-        tool_choice: 'auto',
         temperature: 0.4,
         max_completion_tokens: 900,
         stream: false
@@ -202,7 +207,7 @@ export async function generateContent(prompt: string, kantinId: string) {
 
   } catch (error: any) {
     console.error("Error generating content:", error);
-    
+
     // Handle API key errors specifically
     if (error?.message?.includes('API key') || error?.code === 400 || error?.code === 401) {
       return {
@@ -210,7 +215,7 @@ export async function generateContent(prompt: string, kantinId: string) {
         details: "Pastikan CEREBRAS_API_KEY ada di file .env.local dan valid."
       };
     }
-    
+
     return {
       error: "Failed to generate content.",
       details: error.message || 'Unknown error'
