@@ -108,6 +108,11 @@ export default function CheckoutPage() {
           return // Tunggu poll berikutnya
         }
         
+        // Cegah double redirect
+        if (paymentStatus === 'success') {
+          return
+        }
+        
         setPaymentStatus('success')
         
         // Clear cart immediately on success
