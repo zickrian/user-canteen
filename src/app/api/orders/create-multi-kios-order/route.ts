@@ -142,8 +142,8 @@ export async function POST(request: NextRequest) {
             email: customerDetails.email || 'customer@example.com',
             phone: customerDetails.nomor_meja || '-'
           },
-          // Biarkan Midtrans tampilkan semua payment channel yang aktif
-          // enabled_payments tidak di-set agar semua channel muncul
+          // Menggunakan GoPay untuk pembayaran QRIS
+          enabled_payments: ['gopay']
         })
 
         // Return without creating actual orders - webhook will handle it

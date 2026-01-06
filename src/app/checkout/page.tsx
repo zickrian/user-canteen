@@ -311,11 +311,12 @@ export default function CheckoutPage() {
       }
 
       // Single kios checkout (existing logic)
-      const firstKantinId = cart.items[0].kantin.id
-      const itemsForKantin = cart.items.filter(item => item.kantin.id === firstKantinId)
+      const firstKantin = cart.items[0].kantin
+      const itemsForKantin = cart.items.filter(item => item.kantin.id === firstKantin.id)
 
       const orderData = {
-        kantinId: firstKantinId,
+        kantinId: firstKantin.id,
+        kantinName: firstKantin.nama_kantin,
         grossAmount: cart.totalPrice,
         customerDetails: formData,
         items: itemsForKantin.map(item => ({

@@ -41,35 +41,13 @@ export async function POST(request: NextRequest) {
         }
       } catch (error) {
         console.warn(`Error validating userId ${orderData.userId}:`, error)
-        // If validation fails, set to null to avoid FK constraint violation
       }
     }
 
-    // Generate unique order IDs
-    const pesananId = crypto.randomUUID() // For database pesanan table
-    const midtransOrderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` // For Midtrans
+    // Generate unique Midtrans order ID
+    const midtransOrderId = `ORDER-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 
-    // Get next sequential nomor antrian for this kantin
-    const { data: nomorAntrianData, error: nomorAntrianError } = await supabaseAdmin
-      .rpc('get_next_nomor_antrian', { p_kantin_id: orderData.kantinId })
-
-    if (nomorAntrianError) {
-      console.error('Error getting nomor antrian:', nomorAntrianError)
-      return NextResponse.json(
-        { error: 'Gagal mendapatkan nomor antrian: ' + nomorAntrianError.message },
-        { status: 500 }
-      )
-    }
-
-    const nomorAntrian = nomorAntrianData || 1
-
-    // Create transaction details for Midtrans
-    const transactionDetails = {
-      order_id: midtransOrderId,
-      gross_amount: orderData.grossAmount
-    }
-
-    // Create item details
+    // Create item details for Midtrans
     const itemDetails = orderData.items.map((item: any) => ({
       id: item.menu.id,
       price: item.menu.harga,
@@ -78,100 +56,64 @@ export async function POST(request: NextRequest) {
       category: item.menu.kategori_menu?.[0] || 'Makanan'
     }))
 
-    // Create customer details
+    // Create customer details for Midtrans
     const customerDetails = {
       first_name: orderData.customerDetails.nama_pelanggan || 'Pelanggan',
       email: orderData.customerDetails.email || 'customer@example.com',
       phone: orderData.customerDetails.nomor_meja || '-'
     }
 
+    // Prepare order data for pending storage (single kios format converted to kiosOrders format)
+    const kiosOrders = [{
+      kantinId: orderData.kantinId,
+      kantinName: orderData.kantinName || 'Kantin',
+      items: orderData.items,
+      subtotal: orderData.grossAmount
+    }]
+
+    // Save to pending_qris_orders - pesanan TIDAK dibuat sampai pembayaran berhasil
+    const { error: pendingError } = await supabaseAdmin
+      .from('pending_qris_orders')
+      .insert({
+        midtrans_order_id: midtransOrderId,
+        order_data: JSON.stringify({
+          kiosOrders,
+          customerDetails: orderData.customerDetails,
+          grossAmount: orderData.grossAmount,
+          userId: validUserId
+        }),
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
+
+    if (pendingError) {
+      console.error('Error saving pending order:', pendingError)
+      return NextResponse.json(
+        { error: `Gagal menyimpan data pesanan: ${pendingError.message}` },
+        { status: 500 }
+      )
+    }
+
     // Create Midtrans transaction
     const transaction = await (snap as any).createTransaction({
-      transaction_details: transactionDetails,
+      transaction_details: {
+        order_id: midtransOrderId,
+        gross_amount: orderData.grossAmount
+      },
       item_details: itemDetails,
       customer_details: customerDetails,
       // Menggunakan GoPay (yang di dalamnya ada QR/QRIS GoPay) sesuai requirement
       enabled_payments: ['gopay']
     })
 
-    // Save order to database (pesanan table) dengan semua data yang diperlukan
-    const { data: order, error: orderError } = await supabaseAdmin
-      .from('pesanan')
-      .insert({
-        id: pesananId,
-        kantin_id: orderData.kantinId,
-        nomor_antrian: nomorAntrian,
-        nama_pemesan: orderData.customerDetails.nama_pelanggan || 'Pelanggan',
-        catatan: orderData.customerDetails.catatan_pesanan || null,
-        email: orderData.customerDetails.email || null,
-        nomor_meja: orderData.customerDetails.nomor_meja || null,
-        tipe_pesanan: orderData.customerDetails.tipe_pesanan || null,
-          total_harga: orderData.grossAmount,
-          status: 'menunggu',
-          user_id: validUserId,
-          payment_method: 'qris'
-      })
-      .select()
-      .single()
-
-    if (orderError) {
-      console.error('Error saving order to pesanan:', orderError)
-      return NextResponse.json(
-        { error: 'Gagal menyimpan pesanan: ' + orderError.message },
-        { status: 500 }
-      )
-    }
-
-    // Save order details (detail_pesanan table)
-    const detailPesanan = orderData.items.map((item: any) => ({
-      pesanan_id: pesananId,
-      menu_id: item.menu.id,
-      jumlah: item.quantity,
-      harga_satuan: item.menu.harga,
-      subtotal: item.menu.harga * item.quantity
-    }))
-
-    const { error: detailError } = await supabaseAdmin
-      .from('detail_pesanan')
-      .insert(detailPesanan)
-
-    if (detailError) {
-      console.error('Error saving order details:', detailError)
-      return NextResponse.json(
-        { error: 'Gagal menyimpan detail pesanan: ' + detailError.message },
-        { status: 500 }
-      )
-    }
-
-    // Save payment record (pembayaran table)
-    const { error: paymentError } = await supabaseAdmin
-      .from('pembayaran')
-      .insert({
-        pesanan_id: pesananId,
-        midtrans_order_id: midtransOrderId,
-        gross_amount: orderData.grossAmount,
-        payment_type: 'qris',
-        status: 'pending',
-            email_pelanggan: orderData.customerDetails.email,
-            nomor_meja: orderData.customerDetails.nomor_meja,
-            tipe_pesanan: orderData.customerDetails.tipe_pesanan,
-            payer_id: validUserId
-      })
-
-    if (paymentError) {
-      console.error('Error saving payment record:', paymentError)
-      return NextResponse.json(
-        { error: 'Gagal menyimpan record pembayaran: ' + paymentError.message },
-        { status: 500 }
-      )
-    }
-
+    // Return tanpa membuat pesanan - webhook akan handle setelah pembayaran berhasil
     return NextResponse.json({
       success: true,
-      orderId: pesananId,
       midtransOrderId,
       token: transaction.token,
-      redirect_url: transaction.redirect_url
+      redirect_url: transaction.redirect_url,
+      isPending: true,
+      message: 'Silakan scan QRIS untuk pembayaran. Pesanan akan dibuat setelah pembayaran berhasil.'
     })
 
   } catch (error) {
