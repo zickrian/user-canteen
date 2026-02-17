@@ -25,8 +25,8 @@ export async function generateContent(prompt: string, kantinId: string) {
     // Initialize the client dengan API key yang sudah divalidasi
     const cerebras = new Cerebras({ apiKey });
 
-    // Decide the model here: using llama-3.3-70b
-    const modelName = 'llama-3.3-70b';
+    // Decide the model here: using gpt-oss-120b
+    const modelName = 'gpt-oss-120b';
 
     // Try to connect to MCP server, fallback to direct DB if fails
     console.log('Connecting to MCP server...');

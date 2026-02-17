@@ -1,7 +1,5 @@
 'use client'
 
-import Image from 'next/image'
-
 type MealTime = 'Makan Pagi' | 'Makan Siang' | 'Snack' | 'Minuman' | ''
 
 interface MealFilterProps {
@@ -9,26 +7,26 @@ interface MealFilterProps {
   onSelect: (filter: MealTime) => void
 }
 
-const filters: { label: string; value: MealTime; icon?: string }[] = [
+const filters: { label: string; value: MealTime; icon: string }[] = [
   {
     label: 'Makan Pagi',
     value: 'Makan Pagi',
-    icon: 'https://png.pngtree.com/png-vector/20230901/ourmid/pngtree-breakfast-icon-illustration-vector-png-image_7016287.png',
+    icon: '🌅',
   },
   {
     label: 'Makan Siang',
     value: 'Makan Siang',
-    icon: 'https://png.pngtree.com/png-clipart/20230913/original/pngtree-packed-lunch-vector-png-image_11058643.png',
+    icon: '🍽️',
   },
   {
     label: 'Snack',
     value: 'Snack',
-    icon: 'https://cdn-icons-png.flaticon.com/512/2575/2575818.png',
+    icon: '🍿',
   },
   {
     label: 'Minuman',
     value: 'Minuman',
-    icon: 'https://png.pngtree.com/png-clipart/20230913/original/pngtree-beverages-clipart-collection-of-drinks-with-various-fruit-cartoon-vector-png-image_11064846.png',
+    icon: '🧋',
   },
 ]
 
@@ -48,28 +46,17 @@ export default function MealFilter({ selected, onSelect }: MealFilterProps) {
             }
           `}
         >
-          {filter.icon ? (
-            <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-              <div className={`relative w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg sm:rounded-xl overflow-hidden border shrink-0 ${selected === filter.value ? 'bg-zinc-800 border-zinc-700' : 'bg-zinc-50 border-zinc-100'}`}>
-                <Image
-                  src={filter.icon}
-                  alt={filter.label}
-                  fill
-                  className="object-contain p-1"
-                  sizes="48px"
-                  unoptimized
-                />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs sm:text-sm md:text-base font-bold leading-tight line-clamp-1">{filter.label}</span>
-                <span className={`text-[10px] sm:text-[11px] md:text-xs font-medium ${selected === filter.value ? 'text-zinc-400' : 'text-zinc-400'}`}>
-                  Cari {filter.label.toLowerCase()}
-                </span>
-              </div>
+          <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg sm:rounded-xl border shrink-0 flex items-center justify-center text-xl sm:text-2xl ${selected === filter.value ? 'bg-zinc-800 border-zinc-700' : 'bg-zinc-50 border-zinc-100'}`}>
+              <span aria-hidden="true">{filter.icon}</span>
             </div>
-          ) : (
-            <span className="text-xs sm:text-sm font-medium">{filter.label}</span>
-          )}
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs sm:text-sm md:text-base font-bold leading-tight line-clamp-1">{filter.label}</span>
+              <span className={`text-[10px] sm:text-[11px] md:text-xs font-medium ${selected === filter.value ? 'text-zinc-400' : 'text-zinc-400'}`}>
+                Cari {filter.label.toLowerCase()}
+              </span>
+            </div>
+          </div>
         </button>
       ))}
     </div>

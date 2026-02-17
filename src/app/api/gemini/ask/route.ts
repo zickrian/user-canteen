@@ -1,6 +1,6 @@
 /**
  * AI Assistant API Route dengan Function Calling
- * Route ini menggunakan Cerebras AI (Llama-3.3-70b) dengan function calling untuk
+ * Route ini menggunakan Cerebras AI (GPT-OSS-120b) dengan function calling untuk
  * berinteraksi langsung dengan database melalui MCP (Model Context Protocol)
  */
 
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const firstRequest = await cerebras.chat.completions.create({
-      model: 'llama-3.3-70b',
+      model: 'gpt-oss-120b',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: `User: ${message}\n\nKantin ID: ${kantinId || 'global'}` }
@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
         : '\n\nPENTING: Tool mengembalikan data kosong atau tidak ada data. Katakan "tidak ada" atau "belum ada menu yang sesuai" dengan sopan.'
 
       const secondRequest = await cerebras.chat.completions.create({
-        model: 'llama-3.3-70b',
+        model: 'gpt-oss-120b',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: `User: ${message}\n\nKantin ID: ${kantinId || 'global'}${dataInstruction}` },

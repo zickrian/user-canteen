@@ -216,15 +216,24 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
         headers['Authorization'] = authHeader
       }
 
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          kantin_id: kantinId || undefined,
-          message: userMessage,
-          history: history.length > 0 ? history : undefined
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 20000)
+
+      let response: Response
+      try {
+        response = await fetch('/api/chat', {
+          method: 'POST',
+          headers,
+          signal: controller.signal,
+          body: JSON.stringify({
+            kantin_id: kantinId || undefined,
+            message: userMessage,
+            history: history.length > 0 ? history : undefined
+          })
         })
-      });
+      } finally {
+        clearTimeout(timeoutId)
+      }
 
       const data = await response.json();
       console.log('Chat API Response:', data)
@@ -633,7 +642,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
     return (
       <button
         onClick={handleOpenChat}
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 p-1 transition-transform duration-300 hover:scale-105 z-50 group"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 p-1 transition-transform duration-300 hover:scale-105 z-[10001] group"
         aria-label="Buka AI Assistant"
       >
         <div className="relative h-12 w-12 sm:h-14 sm:w-14 bg-white rounded-full shadow-xl flex items-center justify-center border-2 border-zinc-100 overflow-hidden group-hover:border-orange-200 transition-colors">
@@ -651,7 +660,7 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-[calc(100vw-2rem)] sm:w-96 max-w-[calc(100vw-2rem)] h-[500px] sm:h-[600px] max-h-[85vh] sm:max-h-[80vh] bg-white rounded-2xl sm:rounded-3xl shadow-2xl shadow-zinc-900/20 z-50 flex flex-col border border-zinc-200 overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-[calc(100vw-2rem)] sm:w-96 max-w-[calc(100vw-2rem)] h-[500px] sm:h-[600px] max-h-[85vh] sm:max-h-[80vh] bg-white rounded-2xl sm:rounded-3xl shadow-2xl shadow-zinc-900/20 z-[10001] flex flex-col border border-zinc-200 overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
       {/* Header */}
       <div className="bg-zinc-900 text-white p-3 sm:p-4 flex items-center justify-between">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -771,7 +780,6 @@ export default function AIAssistant({ kantinId, kantin }: AIAssistantProps) {
             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
             placeholder="Ketik pesan..."
             className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-zinc-50 border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:bg-white transition-all text-xs sm:text-sm placeholder:text-zinc-400 text-zinc-900"
-            disabled={isLoading}
           />
           <button
             onClick={handleSendMessage}

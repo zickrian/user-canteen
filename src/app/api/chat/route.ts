@@ -1,6 +1,6 @@
 /**
  * Chat API Route - Chatbot Kantin dengan Cerebras AI Tool Calling
- * Menggunakan model Llama-3.3-70b untuk AI chatbot
+ * Menggunakan model GPT-OSS-120b untuk AI chatbot
  * 
  * Flow: User → Chat API → Cerebras (decide tool) → Tools API → Supabase → Cerebras (summarize) → User
  */
@@ -342,10 +342,10 @@ Akan menampilkan perbandingan: harga, rating, terjual, dan analisis mana yang le
       parameters: {
         type: 'object',
         properties: {
-          menu_names: { 
-            type: 'array', 
+          menu_names: {
+            type: 'array',
             items: { type: 'string' },
-            description: 'Array nama menu yang mau dibandingkan (minimal 2)' 
+            description: 'Array nama menu yang mau dibandingkan (minimal 2)'
           },
           kantin_name: { type: 'string', description: 'Filter by kantin (opsional)' },
         },
@@ -369,10 +369,10 @@ User memilih sendiri menu yang mau dipaketkan, bukan random dari sistem.`,
       parameters: {
         type: 'object',
         properties: {
-          menu_names: { 
-            type: 'array', 
+          menu_names: {
+            type: 'array',
             items: { type: 'string' },
-            description: 'Array nama menu yang dipilih user' 
+            description: 'Array nama menu yang dipilih user'
           },
         },
         required: ['menu_names'],
@@ -393,10 +393,10 @@ PENGGUNAAN:
       parameters: {
         type: 'object',
         properties: {
-          period: { 
-            type: 'string', 
+          period: {
+            type: 'string',
             enum: ['today', 'week', 'month'],
-            description: 'Periode: today (hari ini), week (minggu ini), month (bulan ini)' 
+            description: 'Periode: today (hari ini), week (minggu ini), month (bulan ini)'
           },
           kantin_name: { type: 'string', description: 'Filter by kantin (opsional)' },
           limit: { type: 'number', description: 'Jumlah hasil (default 10)' },
@@ -559,14 +559,14 @@ function isAmbiguousRecommendation(msg: string): boolean {
  */
 function extractKantinName(msg: string): string | null {
   const lowerMsg = msg.toLowerCase().trim()
-  
+
   // Patterns to detect kantin name
   const patterns = [
     /(?:dari|di|menu|makanan|minuman|sebutin|apa\s+aja)\s+(?:kios|kantin|warung|toko)?\s*(.+?)(?:\s+(?:apa|dong|ya|nih|ada|yang))?$/i,
     /(?:kios|kantin|warung|toko)\s+(.+?)(?:\s+(?:apa|dong|ya|nih|ada|yang|menu))?$/i,
     /^(.+?)\s+(?:menu|makanan|minuman)(?:\s+apa)?$/i,
   ]
-  
+
   for (const pattern of patterns) {
     const match = lowerMsg.match(pattern)
     if (match && match[1]) {
@@ -578,7 +578,7 @@ function extractKantinName(msg: string): string | null {
       }
     }
   }
-  
+
   return null
 }
 
@@ -587,14 +587,14 @@ function extractKantinName(msg: string): string | null {
  */
 function isKantinMenuQuery(msg: string): boolean {
   const lowerMsg = msg.toLowerCase().trim()
-  
+
   // Patterns that indicate user is asking about a specific kantin's menu
   const kantinPatterns = [
     /(?:sebutin|list|apa\s+aja|ada\s+apa)\s+(?:makanan|minuman|menu)?\s*(?:dari|di)\s+/i,
     /(?:menu|makanan|minuman)\s+(?:dari|di)\s+/i,
     /(?:dari|di)\s+(?:kios|kantin|warung|toko)?\s*\w+/i,
   ]
-  
+
   return kantinPatterns.some(p => p.test(lowerMsg))
 }
 
@@ -604,7 +604,7 @@ function isKantinMenuQuery(msg: string): boolean {
  */
 function extractMenuQuery(msg: string): string | null {
   const lowerMsg = msg.toLowerCase().trim()
-  
+
   // Patterns for menu queries like "ada ga menu ramen", "ada menu nasi goreng ga", "menu ramen ada?"
   const patterns = [
     /(?:ada\s+(?:ga|gak|tidak|nggak|ngga)?\s*)?menu\s+(.+?)(?:\s+(?:ga|gak|tidak|nggak|ngga|ada|\?))?$/i,
@@ -612,7 +612,7 @@ function extractMenuQuery(msg: string): string | null {
     /(?:cari|mau|pengen|ingin)\s+(.+?)$/i,
     /(.+?)\s+(?:ada\s+(?:ga|gak|tidak|nggak|ngga)?|tersedia)$/i,
   ]
-  
+
   for (const pattern of patterns) {
     const match = lowerMsg.match(pattern)
     if (match && match[1]) {
@@ -624,7 +624,7 @@ function extractMenuQuery(msg: string): string | null {
       }
     }
   }
-  
+
   return null
 }
 
@@ -634,7 +634,7 @@ function extractMenuQuery(msg: string): string | null {
 function generateQuickReplies(context: 'ambiguous' | 'menu_shown' | 'empty_result' | 'greeting'): string[] {
   switch (context) {
     case 'ambiguous':
-      return ['🍳 Makan Pagi', '🍛 Makan Siang', '🍿 Snack', '🥤 Minuman', '💰 Budget 15k', '💰 Budget 20k']
+      return ['🌅 Makan Pagi', '🍽️ Makan Siang', '🍿 Snack', '🧋 Minuman', '💰 Budget 15k', '💰 Budget 20k']
     case 'menu_shown':
       return ['Ada yang lebih murah?', 'Minuman apa yang cocok?', 'Menu populer lainnya']
     case 'empty_result':
@@ -884,7 +884,7 @@ Analisis pesan user dan tentukan apakah perlu memanggil tool untuk mendapatkan d
 
     // First call - let Cerebras decide if tool is needed
     const response = await cerebras.chat.completions.create({
-      model: 'llama-3.3-70b',
+      model: 'gpt-oss-120b',
       messages: [
         { role: 'system', content: fullPrompt },
         { role: 'user', content: trimmedMessage }
@@ -910,12 +910,12 @@ Analisis pesan user dan tentukan apakah perlu memanggil tool untuk mendapatkan d
       for (const fc of functionCalls) {
         let args = JSON.parse((fc as any).function?.arguments || '{}')
         const toolName = (fc as any).function?.name || ''
-        
+
         // Inject user_id for personal recommendation tool
         if (toolName === 'get_personal_recommendation' && currentUserId) {
           args.user_id = currentUserId
         }
-        
+
         const result = await executeToolCall(toolName, args, baseUrl)
         toolResults.push({ name: toolName, result })
 
@@ -926,12 +926,12 @@ Analisis pesan user dan tentukan apakah perlu memanggil tool untuk mendapatkan d
         } else if (result.items) {
           menuData = [...menuData, ...result.items]
         }
-        
+
         if (result.combos) {
           comboData = [...comboData, ...result.combos]
         }
       }
-      
+
       // Deduplicate menuData by id
       const seenIds = new Set<string>()
       menuData = menuData.filter(item => {
@@ -970,7 +970,7 @@ Analisis pesan user dan tentukan apakah perlu memanggil tool untuk mendapatkan d
         // Handle compare menu
         if (tr.name === 'compare_menu' && tr.result.comparison) {
           const comp = tr.result.comparison
-          const menuComparison = comp.menus.map((m: any) => 
+          const menuComparison = comp.menus.map((m: any) =>
             `• ${m.nama_menu} [${m.nama_kantin}]\n  Harga: Rp${m.harga.toLocaleString('id-ID')}\n  Rating: ⭐${m.avg_rating.toFixed(1)} (${m.rating_count} ulasan)\n  Terjual: ${m.total_sold}x`
           ).join('\n\n')
           const analysis = `\nANALISIS:\n- Termurah: ${comp.analysis.cheapest}\n- Termahal: ${comp.analysis.most_expensive}\n- Rating tertinggi: ${comp.analysis.highest_rated}\n- Paling laris: ${comp.analysis.best_seller}\n- Selisih harga: Rp${comp.analysis.price_diff.toLocaleString('id-ID')}`
@@ -1002,10 +1002,10 @@ Analisis pesan user dan tentukan apakah perlu memanggil tool untuk mendapatkan d
             return `Tool ${tr.name}: ${tr.result.message}`
           }
           if (tr.result.items && tr.result.items.length > 0) {
-            const favorites = (tr.result.favorites || []).map((m: any) => 
+            const favorites = (tr.result.favorites || []).map((m: any) =>
               `❤️ ${m.nama_menu} - Rp${Number(m.harga).toLocaleString('id-ID')} [${m.nama_kantin}] (Kamu sudah pesan ${m.order_count}x)`
             ).join('\n')
-            const newRecs = (tr.result.new_recommendations || []).map((m: any) => 
+            const newRecs = (tr.result.new_recommendations || []).map((m: any) =>
               `✨ ${m.nama_menu} - Rp${Number(m.harga).toLocaleString('id-ID')} [${m.nama_kantin}]`
             ).join('\n')
             return `Tool ${tr.name}: REKOMENDASI PERSONAL (berdasarkan ${tr.result.order_count} pesanan kamu):\n\n📌 MENU FAVORIT KAMU:\n${favorites || 'Belum ada'}\n\n🆕 COBA JUGA:\n${newRecs || 'Belum ada rekomendasi baru'}`
@@ -1049,7 +1049,7 @@ ATURAN JAWABAN KETAT:
 Berikan jawaban natural dan ramah berdasarkan data di atas.`
 
       const summaryResponse = await cerebras.chat.completions.create({
-        model: 'llama-3.3-70b',
+        model: 'gpt-oss-120b',
         messages: [
           { role: 'system', content: summaryPrompt }
         ],
@@ -1062,11 +1062,11 @@ Berikan jawaban natural dan ramah berdasarkan data di atas.`
 
       // SAFEGUARD: If we have menu data but AI says "tutup" or "tidak tersedia", override the response
       const hasMenuResults = menuData.length > 0
-      const aiSaysClosed = reply.toLowerCase().includes('tutup') || 
-                          reply.toLowerCase().includes('tidak tersedia') ||
-                          reply.toLowerCase().includes('tidak ada menu') ||
-                          reply.toLowerCase().includes('tidak ditemukan')
-      
+      const aiSaysClosed = reply.toLowerCase().includes('tutup') ||
+        reply.toLowerCase().includes('tidak tersedia') ||
+        reply.toLowerCase().includes('tidak ada menu') ||
+        reply.toLowerCase().includes('tidak ditemukan')
+
       if (hasMenuResults && aiSaysClosed) {
         console.log('[Chat] SAFEGUARD: AI incorrectly said closed/unavailable, overriding response')
         const kantinName = menuData[0]?.nama_kantin || 'kantin ini'
@@ -1110,12 +1110,12 @@ Berikan jawaban natural dan ramah berdasarkan data di atas.`
     // FALLBACK: If we detected a kantin name but AI didn't call tool, force call the tool
     if (detectedKantinName && !reply.toLowerCase().includes('menu') && !reply.toLowerCase().includes('tidak ada')) {
       console.log('[Chat] Fallback: AI didnt call tool for kantin query, forcing list_menu_by_kantin')
-      
+
       const fallbackResult = await executeToolCall('list_menu_by_kantin', { kantin_name: detectedKantinName }, baseUrl)
-      
+
       if (fallbackResult.items && fallbackResult.items.length > 0) {
         const kantinName = fallbackResult.kantin?.nama_kantin || detectedKantinName
-        
+
         return NextResponse.json({
           reply: `Ini menu dari ${kantinName}! 🍽️👇`,
           menuData: fallbackResult.items.slice(0, 10),
@@ -1136,14 +1136,14 @@ Berikan jawaban natural dan ramah berdasarkan data di atas.`
     // FALLBACK: If we detected a menu query but AI didn't call tool, force search
     if (menuQuery) {
       console.log('[Chat] Fallback: AI didnt call tool for menu query, forcing search_menu')
-      
+
       const fallbackResult = await executeToolCall('search_menu', { query: menuQuery }, baseUrl)
-      
+
       if (fallbackResult.items && fallbackResult.items.length > 0) {
-        const menuList = fallbackResult.items.slice(0, 5).map((item: any) => 
+        const menuList = fallbackResult.items.slice(0, 5).map((item: any) =>
           `• ${item.nama_menu} - Rp${Number(item.harga).toLocaleString('id-ID')} [${item.nama_kantin}]`
         ).join('\n')
-        
+
         return NextResponse.json({
           reply: `Ada ${fallbackResult.count} menu "${menuQuery}" yang tersedia! 🍽️\n\n${menuList}`,
           menuData: fallbackResult.items.slice(0, 10),
